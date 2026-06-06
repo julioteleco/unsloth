@@ -7,12 +7,13 @@ container rather than raising, so the dashboard never crashes on a bad feed.
 from __future__ import annotations
 
 import re
+import time
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 
-from .config import cache_ttl_minutes, load_config
+from .config import allow_demo_fallback, cache_ttl_minutes, demo_mode, load_config
 from .utils import (
     get_logger,
     is_cache_fresh,
@@ -24,6 +25,34 @@ from .utils import (
 log = get_logger("mfrh.yfinance")
 
 _OHLCV_COLUMNS = ["datetime", "open", "high", "low", "close", "volume", "ticker"]
+
+# Per-ticker provenance of the most recent download_ohlcv call so the UI can show
+# exactly where each series came from: live | cache | stale_cache | demo | empty.
+_DATA_STATUS: dict[str, str] = {}
+
+# After this many consecutive live-download failures in one call, assume the
+# network is down and stop retrying live for the remaining tickers.
+_BREAKER_THRESHOLD = 2
+
+
+def get_data_status() -> dict[str, str]:
+    """Return a copy of the last per-ticker data-source provenance map."""
+    return dict(_DATA_STATUS)
+
+
+def _make_session():
+    """Return a curl_cffi session impersonating a browser, or None.
+
+    Recent yfinance versions need a real browser-like session (cookies/crumb) to
+    avoid intermittent rate-limit/JSON errors. We use curl_cffi when available
+    and silently fall back to yfinance's default otherwise.
+    """
+    try:
+        from curl_cffi import requests as cffi_requests  # type: ignore
+
+        return cffi_requests.Session(impersonate="chrome")
+    except Exception:
+        return None
 
 
 def _safe_ticker_filename(ticker: str) -> str:
@@ -78,28 +107,51 @@ def _flatten_yf_frame(raw: pd.DataFrame, ticker: str) -> pd.DataFrame:
     return df[_OHLCV_COLUMNS]
 
 
-def _download_single(ticker: str, period: str, interval: str) -> pd.DataFrame:
-    """Download one ticker via yfinance, returning the canonical schema."""
+def _download_single(
+    ticker: str, period: str, interval: str, retries: int = 2, backoff: float = 1.3
+) -> pd.DataFrame:
+    """Download one ticker via yfinance with retries + exponential backoff.
+
+    Uses a browser-impersonating session when ``curl_cffi`` is installed. Returns
+    the canonical schema, or an empty frame after exhausting retries.
+    """
     try:
         import yfinance as yf
     except Exception as exc:  # pragma: no cover - import guard
         log.error("yfinance not importable: %s", exc)
         return pd.DataFrame(columns=_OHLCV_COLUMNS)
 
-    try:
-        raw = yf.download(
-            ticker,
-            period=period,
-            interval=interval,
-            auto_adjust=False,
-            prepost=False,
-            progress=False,
-            threads=False,
-        )
-        return _flatten_yf_frame(raw, ticker)
-    except Exception as exc:
-        log.warning("yfinance download failed for %s (%s/%s): %s", ticker, period, interval, exc)
-        return pd.DataFrame(columns=_OHLCV_COLUMNS)
+    session = _make_session()
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, retries + 1):
+        try:
+            kwargs = dict(
+                period=period,
+                interval=interval,
+                auto_adjust=False,
+                prepost=False,
+                progress=False,
+                threads=False,
+            )
+            if session is not None:
+                kwargs["session"] = session
+            raw = yf.download(ticker, **kwargs)
+            df = _flatten_yf_frame(raw, ticker)
+            if not df.empty:
+                return df
+            # Empty without an exception (e.g. delisted/no data) -> no retry value.
+            log.info("yfinance returned no rows for %s (attempt %d/%d)", ticker, attempt, retries)
+        except Exception as exc:
+            last_exc = exc
+            log.warning(
+                "yfinance download failed for %s (%s/%s) attempt %d/%d: %s",
+                ticker, period, interval, attempt, retries, exc,
+            )
+        if attempt < retries:
+            time.sleep(backoff ** attempt)
+    if last_exc is not None:
+        log.warning("giving up on %s after %d attempts", ticker, retries)
+    return pd.DataFrame(columns=_OHLCV_COLUMNS)
 
 
 def download_ohlcv(
@@ -119,28 +171,84 @@ def download_ohlcv(
     """
     ttl = cache_ttl_minutes() if use_cache else 0
     out: dict[str, pd.DataFrame] = {}
+    use_demo = demo_mode()
+    # Circuit breaker: if the network is clearly down, stop hammering it with
+    # retries+backoff for every ticker — after a few consecutive live failures
+    # we skip live downloads and go straight to cache/demo for the rest.
+    consecutive_failures = 0
+    network_down = False
     for ticker in tickers:
         cache_path = _raw_cache_path(ticker, period, interval)
+
+        # 0) Explicit demo mode: synthetic data, no network. Do NOT persist into
+        #    the real cache path (would later be misread as real data); the
+        #    seed_demo_data.py script writes deliberately when you want that.
+        if use_demo:
+            out[ticker] = _demo_frame(ticker, period, interval, cache_path, persist=False)
+            _DATA_STATUS[ticker] = "demo"
+            continue
+
+        # 1) Fresh cache.
         if not force_refresh and is_cache_fresh(cache_path, ttl):
             cached = read_parquet(cache_path)
             if cached is not None and not cached.empty:
                 out[ticker] = cached
+                _DATA_STATUS[ticker] = "cache"
                 log.info("cache hit: %s (%s/%s, %d rows)", ticker, period, interval, len(cached))
                 continue
 
-        df = _download_single(ticker, period, interval)
-        if df.empty:
-            # Fall back to stale cache if available.
-            stale = read_parquet(cache_path)
-            if stale is not None and not stale.empty:
-                log.info("using stale cache for %s after download failure", ticker)
-                out[ticker] = stale
+        # 2) Live download (with retries/backoff inside), unless the breaker tripped.
+        if not network_down:
+            df = _download_single(ticker, period, interval)
+            if not df.empty:
+                write_parquet(df, cache_path)
+                out[ticker] = df
+                _DATA_STATUS[ticker] = "live"
+                consecutive_failures = 0
+                log.info("downloaded %s: %d rows (%s/%s)", ticker, len(df), period, interval)
                 continue
-        else:
-            write_parquet(df, cache_path)
-        out[ticker] = df
-        log.info("downloaded %s: %d rows (%s/%s)", ticker, len(df), period, interval)
+            consecutive_failures += 1
+            if consecutive_failures >= _BREAKER_THRESHOLD:
+                network_down = True
+                log.warning(
+                    "network appears unavailable after %d consecutive failures; "
+                    "skipping live downloads for remaining tickers",
+                    consecutive_failures,
+                )
+
+        # 3) Stale cache fallback.
+        stale = read_parquet(cache_path)
+        if stale is not None and not stale.empty:
+            log.info("using stale cache for %s after download failure", ticker)
+            out[ticker] = stale
+            _DATA_STATUS[ticker] = "stale_cache"
+            continue
+
+        # 4) Last resort: clearly-labelled demo data so the app never breaks.
+        if allow_demo_fallback():
+            out[ticker] = _demo_frame(ticker, period, interval, cache_path, persist=False)
+            _DATA_STATUS[ticker] = "demo_fallback"
+            log.warning("no live/cache data for %s; using demo fallback", ticker)
+            continue
+
+        out[ticker] = df  # empty
+        _DATA_STATUS[ticker] = "empty"
     return out
+
+
+def _demo_frame(
+    ticker: str, period: str, interval: str, cache_path: Path, persist: bool = True
+) -> pd.DataFrame:
+    """Build (and optionally cache) a deterministic synthetic frame."""
+    from .demo_data import generate_ohlcv
+
+    df = generate_ohlcv(ticker, period=period, interval=interval)
+    if persist and not df.empty:
+        try:
+            write_parquet(df, cache_path)
+        except Exception:  # caching demo data is best-effort
+            pass
+    return df
 
 
 def download_daily(

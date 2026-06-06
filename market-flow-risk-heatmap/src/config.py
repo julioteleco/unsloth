@@ -202,3 +202,24 @@ def cache_ttl_minutes() -> int:
     if env and env.isdigit():
         return int(env)
     return load_config().download.cache_ttl_minutes
+
+
+def demo_mode() -> bool:
+    """True if demo/offline data should be used (env ``MFRH_DEMO_MODE``).
+
+    Accepts 1/true/yes/on. When enabled, the loaders serve deterministic
+    synthetic data instead of hitting the network — useful offline, in CI, or
+    for screenshots. Data is always labelled as demo where it surfaces.
+    """
+    return os.getenv("MFRH_DEMO_MODE", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def allow_demo_fallback() -> bool:
+    """True if the loader may fall back to synthetic data after a failed fetch.
+
+    Controlled by ``MFRH_DEMO_FALLBACK`` (default ON). This guarantees the app
+    never renders empty: if the network is unavailable and there is no cache, it
+    degrades to clearly-labelled demo data rather than a blank screen.
+    """
+    val = os.getenv("MFRH_DEMO_FALLBACK", "1").strip().lower()
+    return val in {"1", "true", "yes", "on"}

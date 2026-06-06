@@ -80,6 +80,36 @@ Todas las fuentes degradan de forma independiente: si una falla, el resto sigue.
 - **Rotación sectorial**: ratios XLY/XLP y XLI/XLU (cíclico vs defensivo).
 - **Estacionalidad**: flags de OPEX, quad-witching, fin de mes y ventana de cierre.
 
+## Datos: robustez, modo offline y diagnóstico
+
+El sistema está diseñado para que **nunca** se quede sin datos ni se bloquee:
+
+1. **Descarga con reintentos** — yfinance se llama con reintentos + backoff
+   exponencial y, si está instalado, una sesión `curl_cffi` que imita un navegador
+   (evita errores intermitentes de rate-limit/cookies).
+2. **Circuit breaker** — si la red está caída, tras 2 fallos consecutivos deja de
+   reintentar en vivo y pasa directo a caché/demo (build offline en ~5s, no ~100s).
+3. **Caché local** (parquet) con *fallback a caché obsoleta* si una descarga falla.
+4. **Modo demo / offline** — datos sintéticos **reproducibles** para usar el panel
+   sin red. Se activa con la casilla del sidebar, con `MFRH_DEMO_MODE=1`, o
+   automáticamente como último recurso (`MFRH_DEMO_FALLBACK=1`, por defecto).
+5. **Provenance transparente** — el dashboard muestra un banner indicando si los
+   datos son reales (`live`/`cache`) o demo, y un desglose por ticker.
+
+```bash
+# Diagnóstico: ¿qué fuentes funcionan en esta máquina?
+python scripts/check_data.py --ticker SPY --period 5d
+
+# Sembrar datos demo en caché para usar el panel sin red:
+python scripts/seed_demo_data.py --period 60d --interval 5m
+
+# Forzar modo demo en cualquier comando / dashboard:
+MFRH_DEMO_MODE=1 streamlit run app/streamlit_app.py
+```
+
+> Los datos demo son **sintéticos y deterministas**, solo para demostración/offline.
+> NO son datos reales de mercado y nunca se presentan como tales.
+
 ## Limitaciones importantes
 
 - **yfinance intradía**: el histórico de 5m suele limitarse a ~60 días; los datos

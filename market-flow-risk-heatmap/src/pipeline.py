@@ -11,7 +11,12 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from .config import load_config
-from .data_yfinance import download_ohlcv, download_options_snapshot, latest_close
+from .data_yfinance import (
+    download_ohlcv,
+    download_options_snapshot,
+    get_data_status,
+    latest_close,
+)
 from .features_breadth import breadth_quality_score, breadth_snapshot, build_breadth_proxy
 from .features_options import compute_options_features
 from .features_regime import classify_regime, compute_regime_features
@@ -41,6 +46,21 @@ class TickerBundle:
     options_features: dict
     regime: dict
     raw: dict = field(default_factory=dict)
+    data_status: dict = field(default_factory=dict)
+
+    def data_summary(self) -> dict:
+        """Aggregate provenance: counts by source + overall flags."""
+        counts: dict[str, int] = {}
+        for src in self.data_status.values():
+            counts[src] = counts.get(src, 0) + 1
+        is_demo = any(s in ("demo", "demo_fallback") for s in self.data_status.values())
+        primary_src = self.data_status.get(self.ticker, "unknown")
+        return {
+            "counts": counts,
+            "is_demo": is_demo,
+            "primary_source": primary_src,
+            "n_tickers": len(self.data_status),
+        }
 
 
 def build_intraday_features(df: pd.DataFrame) -> tuple[pd.DataFrame, VolumeProfile]:
@@ -166,6 +186,7 @@ def build_ticker_bundle(
         options_features=options_features,
         regime=regime,
         raw=data_dict,
+        data_status=get_data_status(),
     )
 
 

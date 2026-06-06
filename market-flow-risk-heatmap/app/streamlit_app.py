@@ -9,6 +9,7 @@ not financial advice and does not generate trade signals.
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -43,10 +44,16 @@ SCORE_COLORS = {
 
 
 @st.cache_data(show_spinner=True, ttl=cfg.download.cache_ttl_minutes * 60)
-def _load_bundle(ticker: str, period: str, interval: str, use_options: bool, nonce: int):
-    """Cached bundle builder. ``nonce`` busts the cache on manual refresh."""
+def _load_bundle(ticker: str, period: str, interval: str, use_options: bool, nonce: int,
+                 demo: bool = False):
+    """Cached bundle builder. ``nonce`` busts the cache on manual refresh.
+
+    ``demo`` is part of the cache key so toggling demo mode rebuilds the bundle.
+    """
+    os.environ["MFRH_DEMO_MODE"] = "1" if demo else "0"
     return build_ticker_bundle(
-        ticker, period=period, interval=interval, use_options=use_options, force_refresh=bool(nonce)
+        ticker, period=period, interval=interval, use_options=use_options,
+        force_refresh=bool(nonce) or demo,
     )
 
 
@@ -145,15 +152,21 @@ def main() -> None:
         interval = st.selectbox("Intervalo", ["5m", "15m", "1h"], index=0)
         use_options = st.checkbox("Opciones lite (SPY/QQQ)", value=True)
         use_finra = st.checkbox("FINRA short-volume (proxy débil)", value=False)
+        demo = st.checkbox("Modo demo (datos sintéticos, sin red)",
+                           value=os.getenv("MFRH_DEMO_MODE", "").lower() in {"1", "true", "yes", "on"},
+                           help="Genera datos reproducibles para usar el panel sin conexión.")
+        os.environ["MFRH_DEMO_MODE"] = "1" if demo else "0"
         if "refresh_nonce" not in st.session_state:
             st.session_state.refresh_nonce = 0
         if st.button("🔄 Actualizar datos"):
             st.session_state.refresh_nonce += 1
             st.cache_data.clear()
         st.markdown("---")
-        st.caption("Las opciones y FINRA degradan sin romper si fallan.")
+        st.caption("Las opciones y FINRA degradan sin romper si fallan. "
+                   "Si no hay red ni caché, se usan datos demo automáticamente.")
 
-    bundle = _load_bundle(ticker, period, interval, use_options, st.session_state.refresh_nonce)
+    bundle = _load_bundle(ticker, period, interval, use_options,
+                          st.session_state.refresh_nonce, demo)
 
     if bundle.features is None or bundle.features.empty:
         st.error(
@@ -165,6 +178,20 @@ def main() -> None:
     feats = bundle.features
     scores, row = latest_scores(bundle)
     diag = explain_current_state(row, scores)
+
+    # ---- Data provenance banner (solves "is this real data?") ----------- #
+    summary = bundle.data_summary()
+    if summary["is_demo"]:
+        st.warning(
+            "⚠️ **Datos DEMO sintéticos** (sin conexión a Yahoo Finance). Reproducibles "
+            "y solo para demostración — NO son datos reales de mercado. En tu máquina con "
+            "internet se usarán datos reales automáticamente."
+        )
+    else:
+        st.success(f"✅ Datos reales · fuente principal: `{summary['primary_source']}`")
+    with st.expander("Estado de fuentes de datos (provenance por ticker)"):
+        st.write({"resumen": summary["counts"]})
+        st.json(bundle.data_status, expanded=False)
 
     regime = bundle.regime.get("regime", "neutral")
     st.markdown(f"### Régimen actual: `{regime}`  ·  Ticker: `{ticker}`")
