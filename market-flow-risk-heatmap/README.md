@@ -29,19 +29,25 @@ factores dominantes:
 
 Además calcula features de microestructura aproximada:
 
-- **VWAP de sesión** (reinicio diario) + distancia en valor, %, y múltiplos de ATR.
-- **ATR intradía** configurable.
+- **VWAP de sesión** (reinicio diario) + distancia en valor, %, múltiplos de ATR y
+  **unidades de σ**. Incluye **bandas VWAP ±1σ/±2σ ponderadas por volumen**
+  (desviación típica volumen-ponderada acumulada por sesión).
+- **ATR intradía** con **suavizado de Wilder (RMA)** por defecto, o media simple.
 - **RVOL por minuto de sesión** — compara el volumen de cada barra con la *mediana
   histórica del mismo minuto de sesión*, no con una media global (respeta la curva
-  de volumen en U).
+  de volumen en U). Vectorizado, winsorizado y con **z-score log-RVOL**.
 - **Volume Profile aproximado** — POC, VAH/VAL (área de valor 70%), HVN/LVN.
 - **Breadth proxy gratis** — ratios RSP/SPY, SMH/QQQ, IWM/SPY, HYG/TLT, XLK/SPY, XLF/SPY.
 - **Opciones lite** (SPY/QQQ) — put/call ratios, strikes de OI máxima, "gamma wall" proxy.
+- **Macro (FRED, opcional)** — term spread 10y-2y, nivel del 10Y, señal de curva
+  invertida; alimenta el régimen y el contexto de scoring sin romper si no hay key.
 - **Régimen** — bullish/bearish trend, mean_reversion, high_volatility,
   low_quality_rally, risk_off, neutral.
 
-Y para validación, un **labeling triple-barrier** con MFE/MAE y un **backtest
-analítico por buckets de score** (sin ejecución).
+Y para validación, un **labeling triple-barrier** con etiquetas **long y short
+simétricas** (barreras espejo), MFE/MAE y un **backtest analítico por buckets de
+score** (sin ejecución) que valida cada score contra el outcome correcto
+(long vs short).
 
 ## ¿Qué NO hace?
 

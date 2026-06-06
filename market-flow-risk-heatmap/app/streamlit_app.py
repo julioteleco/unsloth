@@ -52,6 +52,19 @@ def _load_bundle(ticker: str, period: str, interval: str, use_options: bool, non
 
 def price_chart(feats: pd.DataFrame, profile) -> go.Figure:
     fig = go.Figure()
+    # Volume-weighted VWAP sigma bands (drawn first so price overlays them).
+    if {"vwap_upper_2", "vwap_lower_2"}.issubset(feats.columns):
+        fig.add_trace(go.Scatter(x=feats.index, y=feats["vwap_upper_2"], name="+2σ",
+                                 line=dict(color="rgba(155,89,182,0.0)"), showlegend=False))
+        fig.add_trace(go.Scatter(x=feats.index, y=feats["vwap_lower_2"], name="VWAP ±2σ",
+                                 fill="tonexty", fillcolor="rgba(155,89,182,0.10)",
+                                 line=dict(color="rgba(155,89,182,0.0)")))
+    if {"vwap_upper_1", "vwap_lower_1"}.issubset(feats.columns):
+        fig.add_trace(go.Scatter(x=feats.index, y=feats["vwap_upper_1"], name="+1σ",
+                                 line=dict(color="rgba(155,89,182,0.0)"), showlegend=False))
+        fig.add_trace(go.Scatter(x=feats.index, y=feats["vwap_lower_1"], name="VWAP ±1σ",
+                                 fill="tonexty", fillcolor="rgba(155,89,182,0.18)",
+                                 line=dict(color="rgba(155,89,182,0.0)")))
     fig.add_trace(go.Scatter(x=feats.index, y=feats["close"], name="Close", line=dict(color="#3498db")))
     if "vwap" in feats.columns:
         fig.add_trace(go.Scatter(x=feats.index, y=feats["vwap"], name="VWAP",
@@ -157,6 +170,19 @@ def main() -> None:
     st.markdown(f"### Régimen actual: `{regime}`  ·  Ticker: `{ticker}`")
     for r in bundle.regime.get("reasons", []):
         st.caption(f"• {r}")
+    # Macro context (FRED) shown only when a key is configured.
+    macro = bundle.context.get("macro") or {}
+    if macro:
+        rf = bundle.regime.get("features", {})
+        ts10y2y = rf.get("term_spread_10y_2y")
+        bits = []
+        if ts10y2y is not None and np.isfinite(ts10y2y):
+            inv = " (invertida)" if ts10y2y < 0 else ""
+            bits.append(f"spread 10y-2y: {ts10y2y:+.2f}%{inv}")
+        if "DGS10" in macro:
+            bits.append(f"10Y: {macro['DGS10']:.2f}%")
+        if bits:
+            st.caption("Macro (FRED): " + " · ".join(bits))
 
     # ----------------------------- Price + heatmap ------------------------ #
     col_a, col_b = st.columns([3, 2])
@@ -225,7 +251,8 @@ def main() -> None:
     # ----------------------------- Last session table -------------------- #
     st.subheader("Tabla última sesión")
     table_cols = [
-        "close", "vwap", "rvol", "atr", "distance_to_vwap_atr", "inside_value_area",
+        "close", "vwap", "rvol", "rvol_zscore", "atr", "distance_to_vwap_atr",
+        "distance_to_vwap_band", "inside_value_area",
     ]
     present = [c for c in table_cols if c in feats.columns]
     last_session = feats[feats["session_date"] == feats["session_date"].iloc[-1]] if "session_date" in feats.columns else feats.tail(40)

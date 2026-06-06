@@ -51,14 +51,17 @@ class FredConfig(BaseModel):
 
 class VwapConfig(BaseModel):
     atr_window: int = 14
+    band_sigmas: list[float] = Field(default_factory=lambda: [1.0, 2.0])
 
 
 class AtrConfig(BaseModel):
     window: int = 14
+    method: str = "wilder"
 
 
 class RvolConfig(BaseModel):
     lookback_days: int = 20
+    clip_max: float = 10.0
 
 
 class VolumeProfileConfig(BaseModel):

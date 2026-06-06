@@ -51,8 +51,13 @@ def compute_regime_features(
     qqq_vwap_df: pd.DataFrame | None,
     vix_df: pd.DataFrame | None,
     breadth_snapshot: dict | None,
+    macro_snapshot: dict | None = None,
 ) -> dict:
-    """Assemble the regime feature dict (one snapshot for the latest bar)."""
+    """Assemble the regime feature dict (one snapshot for the latest bar).
+
+    ``macro_snapshot`` is an optional FRED dict (see ``data_fred``) carrying e.g.
+    ``TERM_SPREAD_10Y_2Y``. It is purely additive context and may be empty.
+    """
     feats: dict = {}
     feats.update(compute_vix_features(vix_df))
 
@@ -68,6 +73,13 @@ def compute_regime_features(
     feats["risk_on_proxy"] = float(snap.get("HYG/TLT", {}).get("ratio_trend", 0.0))
     feats["tech_leadership"] = float(snap.get("SMH/QQQ", {}).get("ratio_trend", 0.0))
     feats["breadth_quality"] = breadth_quality_score(snap)
+
+    macro = macro_snapshot or {}
+    feats["term_spread_10y_2y"] = macro.get("TERM_SPREAD_10Y_2Y", np.nan)
+    feats["yield_curve_inverted"] = bool(
+        feats["term_spread_10y_2y"] < 0 if not np.isnan(feats["term_spread_10y_2y"]) else False
+    )
+    feats["macro_available"] = bool(macro)
     return feats
 
 
@@ -93,6 +105,8 @@ def classify_regime(feats: dict) -> dict:
 
     if vix_rising and risk_on < 0 and not spy_up:
         reasons.append("VIX subiendo, crédito (HYG/TLT) débil y SPY bajo VWAP")
+        if feats.get("yield_curve_inverted"):
+            reasons.append("curva 10y-2y invertida (contexto macro de riesgo)")
         return {"regime": "risk_off", "reasons": reasons}
 
     if spy_up and qqq_up and breadth_q >= 0.6 and not vix_above_ma20:

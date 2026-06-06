@@ -318,6 +318,7 @@ def score_breakout_quality(row: pd.Series, context: dict) -> ScoreResult:
 def score_mean_reversion_probability(row: pd.Series, context: dict) -> ScoreResult:
     """Relative probability that price reverts toward VWAP/value."""
     dist_atr = _row_get(row, "distance_to_vwap_atr")
+    dist_band = _row_get(row, "distance_to_vwap_band")  # volume-weighted σ units
     rvol = _row_get(row, "rvol")
     near_node = bool(row.get("near_hvn", False)) or (not bool(row.get("inside_value_area", True)))
     breadth_q = _ctx(context, "breadth_quality", default=0.5)
@@ -326,16 +327,20 @@ def score_mean_reversion_probability(row: pd.Series, context: dict) -> ScoreResu
     # No breadth confirmation in the direction of the move raises reversion odds.
     breadth_disagrees = (1.0 - breadth_q) if dist_atr > 0 else breadth_q
     vix_disagrees = 1.0 if (dist_atr > 0 and vix_rising) or (dist_atr < 0 and not vix_rising) else 0.0
+    # Stretch beyond the volume-weighted VWAP bands is a strong reversion tell.
+    band_stretch = _saturate(abs(dist_band), 1.5) if not np.isnan(dist_band) else 0.0
     factors = [
-        Factor("extreme_distance_to_vwap", _saturate(abs(dist_atr), 1.2), 0.30,
+        Factor("extreme_distance_to_vwap", _saturate(abs(dist_atr), 1.2), 0.24,
                f"distancia extrema a VWAP ({dist_atr:.1f} ATR)" if abs(dist_atr) > 1.5 else ""),
-        Factor("climactic_rvol", _saturate(max(rvol - 1.0, 0), 1.5), 0.20,
+        Factor("beyond_vwap_bands", band_stretch, 0.16,
+               f"precio fuera de las bandas VWAP ({dist_band:+.1f}σ)" if abs(dist_band) > 2.0 else ""),
+        Factor("climactic_rvol", _saturate(max(rvol - 1.0, 0), 1.5), 0.18,
                f"RVOL climático {rvol:.1f}" if rvol > 1.8 else ""),
-        Factor("arrived_at_node", 0.8 if near_node else 0.0, 0.18,
+        Factor("arrived_at_node", 0.8 if near_node else 0.0, 0.16,
                "llegada a VAH/VAL/HVN" if near_node else ""),
-        Factor("breadth_no_confirm", breadth_disagrees, 0.18,
+        Factor("breadth_no_confirm", breadth_disagrees, 0.14,
                "ausencia de confirmación de breadth" if breadth_disagrees > 0.55 else ""),
-        Factor("vix_no_confirm", vix_disagrees, 0.14,
+        Factor("vix_no_confirm", vix_disagrees, 0.12,
                "VIX no acompaña la dirección del precio" if vix_disagrees > 0 else ""),
     ]
     return _finalize("Mean_Reversion_Probability", factors)

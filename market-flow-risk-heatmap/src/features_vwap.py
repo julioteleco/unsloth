@@ -23,24 +23,35 @@ def _ensure_indexed(df: pd.DataFrame) -> pd.DataFrame:
     return out.sort_index()
 
 
-def calculate_atr(df: pd.DataFrame, window: int = 14) -> pd.DataFrame:
-    """Add a simple (rolling-mean) ATR and ATR percent to the frame.
-
-    True Range = max(high-low, |high-prev_close|, |low-prev_close|).
-    ``atr`` is the rolling mean of TR over ``window`` bars; ``atr_pct`` expresses
-    it as a fraction of close.
-    """
-    out = df.copy()
-    prev_close = out["close"].shift(1)
-    tr = pd.concat(
+def true_range(df: pd.DataFrame) -> pd.Series:
+    """True Range = max(high-low, |high-prev_close|, |low-prev_close|)."""
+    prev_close = df["close"].shift(1)
+    return pd.concat(
         [
-            out["high"] - out["low"],
-            (out["high"] - prev_close).abs(),
-            (out["low"] - prev_close).abs(),
+            df["high"] - df["low"],
+            (df["high"] - prev_close).abs(),
+            (df["low"] - prev_close).abs(),
         ],
         axis=1,
     ).max(axis=1)
-    out["atr"] = tr.rolling(window, min_periods=max(2, window // 2)).mean()
+
+
+def calculate_atr(df: pd.DataFrame, window: int = 14, method: str | None = None) -> pd.DataFrame:
+    """Add ATR and ATR percent to the frame.
+
+    ``method='wilder'`` uses Wilder's RMA smoothing (the canonical ATR, an EWMA
+    with ``alpha = 1/window``), which is what most charting/quant stacks report.
+    ``method='sma'`` uses a simple rolling mean. ``atr_pct`` is ATR / close.
+    """
+    cfg = load_config().features.atr
+    method = (method or cfg.method).lower()
+    out = df.copy()
+    tr = true_range(out)
+    min_p = max(2, window // 2)
+    if method == "sma":
+        out["atr"] = tr.rolling(window, min_periods=min_p).mean()
+    else:  # wilder (RMA)
+        out["atr"] = tr.ewm(alpha=1.0 / window, min_periods=min_p, adjust=False).mean()
     out["atr_pct"] = out["atr"] / out["close"].replace(0, np.nan)
     return out
 
@@ -64,9 +75,11 @@ def calculate_session_vwap(df: pd.DataFrame, atr_window: int | None = None) -> p
     if out.empty:
         for c in [
             "vwap",
+            "vwap_std",
             "distance_to_vwap",
             "distance_to_vwap_pct",
             "distance_to_vwap_atr",
+            "distance_to_vwap_band",
             "atr",
             "atr_pct",
         ]:
@@ -75,18 +88,34 @@ def calculate_session_vwap(df: pd.DataFrame, atr_window: int | None = None) -> p
 
     out["session_date"] = session_date(out.index).values
     typical = (out["high"] + out["low"] + out["close"]) / 3.0
-    out["_tp_vol"] = typical * out["volume"].fillna(0)
+    vol = out["volume"].fillna(0)
+    out["_tp_vol"] = typical * vol
+    out["_tp2_vol"] = (typical ** 2) * vol
     grp = out.groupby("session_date", sort=False)
     cum_tpvol = grp["_tp_vol"].cumsum()
-    cum_vol = grp["volume"].apply(lambda s: s.fillna(0).cumsum()).reset_index(level=0, drop=True)
+    cum_tp2vol = grp["_tp2_vol"].cumsum()
+    cum_vol = grp["volume"].transform(lambda s: s.fillna(0).cumsum())
     out["vwap"] = cum_tpvol / cum_vol.replace(0, np.nan)
     # First bar of a session with zero volume falls back to typical price.
     out["vwap"] = out["vwap"].fillna(typical)
-    out = out.drop(columns=["_tp_vol"])
+
+    # Volume-weighted standard deviation around the session VWAP:
+    #   var = E[tp^2] - E[tp]^2  (both volume-weighted, cumulative within session)
+    mean_tp2 = cum_tp2vol / cum_vol.replace(0, np.nan)
+    vw_var = (mean_tp2 - out["vwap"] ** 2).clip(lower=0)
+    out["vwap_std"] = np.sqrt(vw_var)
+    out = out.drop(columns=["_tp_vol", "_tp2_vol"])
+
+    for sigma in cfg.features.vwap.band_sigmas:
+        tag = str(sigma).rstrip("0").rstrip(".") if "." in str(sigma) else str(sigma)
+        out[f"vwap_upper_{tag}"] = out["vwap"] + sigma * out["vwap_std"]
+        out[f"vwap_lower_{tag}"] = out["vwap"] - sigma * out["vwap_std"]
 
     out = calculate_atr(out, window=atr_window)
 
     out["distance_to_vwap"] = out["close"] - out["vwap"]
     out["distance_to_vwap_pct"] = out["distance_to_vwap"] / out["vwap"].replace(0, np.nan)
     out["distance_to_vwap_atr"] = out["distance_to_vwap"] / out["atr"].replace(0, np.nan)
+    # Distance expressed in volume-weighted-σ band units (mean-reversion signal).
+    out["distance_to_vwap_band"] = out["distance_to_vwap"] / out["vwap_std"].replace(0, np.nan)
     return out

@@ -49,7 +49,7 @@ def build_intraday_features(df: pd.DataFrame) -> tuple[pd.DataFrame, VolumeProfi
     feats = calculate_session_vwap(df)
     rvol = calculate_rvol_by_session_minute(df)
     # Merge RVOL columns (share the same index after both reindex to datetime).
-    for col in ["session_minute", "median_volume_same_minute", "rvol"]:
+    for col in ["session_minute", "median_volume_same_minute", "rvol", "rvol_zscore"]:
         if col in rvol.columns:
             feats[col] = rvol[col].reindex(feats.index)
 
@@ -75,13 +75,14 @@ def build_context(
     primary_feats: pd.DataFrame,
     qqq_feats: pd.DataFrame | None,
     options_features: dict | None,
+    macro_snapshot: dict | None = None,
 ) -> tuple[dict, dict, dict, dict]:
     """Assemble cross-asset context, breadth, snapshot and regime dicts."""
     breadth = build_breadth_proxy(data_dict)
     snap = breadth_snapshot(breadth)
 
     vix_df = data_dict.get("^VIX", pd.DataFrame())
-    regime_feats = compute_regime_features(primary_feats, qqq_feats, vix_df, snap)
+    regime_feats = compute_regime_features(primary_feats, qqq_feats, vix_df, snap, macro_snapshot)
     regime = classify_regime(regime_feats)
     regime["features"] = regime_feats
 
@@ -90,8 +91,11 @@ def build_context(
         "risk_on_proxy": regime_feats.get("risk_on_proxy", 0.0),
         "tech_leadership": regime_feats.get("tech_leadership", 0.0),
         "vix_rising": regime_feats.get("vix_rising", False),
+        "vix_level": regime_feats.get("vix_level", float("nan")),
+        "term_spread_10y_2y": regime_feats.get("term_spread_10y_2y", float("nan")),
         "regime": regime.get("regime", "neutral"),
         "options": options_features or {"available": False},
+        "macro": macro_snapshot or {},
     }
     return context, breadth, snap, regime
 
@@ -125,8 +129,18 @@ def build_ticker_bundle(
         snap = download_options_snapshot(ticker)
         options_features = compute_options_features(snap, spot=latest_close(primary_df))
 
+    # Optional FRED macro context (no-op without FRED_API_KEY).
+    macro_snapshot: dict = {}
+    try:
+        from .data_fred import fred_available, latest_macro_snapshot
+
+        if fred_available():
+            macro_snapshot = latest_macro_snapshot()
+    except Exception:  # macro is purely additive; never block the pipeline
+        macro_snapshot = {}
+
     context, breadth, breadth_snap, regime = build_context(
-        data_dict, feats, qqq_feats, options_features
+        data_dict, feats, qqq_feats, options_features, macro_snapshot
     )
 
     return TickerBundle(

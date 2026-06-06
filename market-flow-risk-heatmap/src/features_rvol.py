@@ -43,30 +43,31 @@ def calculate_rvol_by_session_minute(
         out["rvol"] = np.nan
         return out
 
+    cfg = load_config().features.rvol
     out["session_date"] = session_date(out.index).values
     out["session_minute"] = session_minute(out.index).values
     out["volume"] = out["volume"].fillna(0)
 
-    # Work on positional integers to stay robust against duplicate timestamps.
+    # Pivot to a [session x minute] volume matrix, then take a trailing median of
+    # the SAME minute across the prior `lookback_days` sessions (excluding today,
+    # so there is no same-bar leakage). This is fully vectorised.
+    tmp = out.reset_index().rename(columns={out.index.name or "index": "datetime"})
+    by_session = tmp.groupby(["session_date", "session_minute"])["volume"].last().reset_index()
+    pivot = by_session.pivot(index="session_date", columns="session_minute", values="volume")
+    pivot = pivot.sort_index()
+    # Trailing median over previous sessions only (shift(1) drops current row).
+    trailing_median = pivot.shift(1).rolling(window=lookback_days, min_periods=1).median()
+
+    median_map = trailing_median.stack(future_stack=True).rename("median_volume_same_minute")
+    median_df = median_map.reset_index()
     out = out.reset_index().rename(columns={out.index.name or "index": "datetime"})
-    medians = np.full(len(out), np.nan)
-
-    sessions = sorted(out["session_date"].unique())
-    session_pos = {d: i for i, d in enumerate(sessions)}
-
-    for _minute, grp in out.groupby("session_minute", sort=False):
-        # Volume at this minute per session (last wins on overlap).
-        by_session = grp.groupby("session_date")["volume"].last()
-        for pos, sess in zip(grp.index, grp["session_date"]):
-            cur_pos = session_pos[sess]
-            prior_vols = [
-                by_session[s] for s in by_session.index if session_pos[s] < cur_pos
-            ]
-            prior_vols = prior_vols[-lookback_days:]
-            if prior_vols:
-                medians[pos] = float(np.median(prior_vols))
-
-    out["median_volume_same_minute"] = medians
+    out = out.merge(median_df, on=["session_date", "session_minute"], how="left")
     out = out.set_index("datetime")
+
     out["rvol"] = out["volume"] / out["median_volume_same_minute"].replace(0, np.nan)
+    if cfg.clip_max and cfg.clip_max > 0:
+        out["rvol"] = out["rvol"].clip(upper=cfg.clip_max)
+    # Log-RVOL z-score across the sample: a standardised "how unusual" measure.
+    log_rvol = np.log(out["rvol"].replace(0, np.nan))
+    out["rvol_zscore"] = (log_rvol - log_rvol.mean()) / log_rvol.std(ddof=0) if log_rvol.notna().sum() > 2 else np.nan
     return out

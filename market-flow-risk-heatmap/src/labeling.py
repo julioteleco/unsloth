@@ -37,6 +37,7 @@ def label_triple_barrier(
     out = df.copy()
     n = len(out)
     label = np.full(n, np.nan)
+    label_short = np.full(n, np.nan)
     mfe = np.full(n, np.nan)
     mae = np.full(n, np.nan)
     bars_to_mfe = np.full(n, np.nan)
@@ -44,7 +45,8 @@ def label_triple_barrier(
 
     if n == 0 or "close" not in out.columns or "atr" not in out.columns:
         for c, v in [
-            ("label_long", label), ("mfe_atr", mfe), ("mae_atr", mae),
+            ("label_long", label), ("label_short", label_short),
+            ("mfe_atr", mfe), ("mae_atr", mae),
             ("bars_to_mfe", bars_to_mfe), ("bars_to_mae", bars_to_mae),
         ]:
             out[c] = v
@@ -60,15 +62,20 @@ def label_triple_barrier(
         if not np.isfinite(a) or a <= 0:
             continue
         entry = close[i]
-        up_barrier = entry + upper_atr * a
-        dn_barrier = entry - lower_atr * a
+        # Long barriers: profit above (+upper), stop below (-lower).
+        long_up = entry + upper_atr * a
+        long_dn = entry - lower_atr * a
+        # Short barriers are mirrored: profit below (-upper), stop above (+lower).
+        short_dn = entry - upper_atr * a
+        short_up = entry + lower_atr * a
         end = min(i + horizon_bars, n - 1)
         if end <= i:
             continue
 
         best_up = -np.inf
         best_dn = np.inf
-        touched = None
+        touched = None        # long outcome
+        touched_short = None  # short outcome (own barriers)
         for j in range(i + 1, end + 1):  # FORWARD only
             hi_excursion = (high[j] - entry) / a
             lo_excursion = (low[j] - entry) / a
@@ -79,22 +86,33 @@ def label_triple_barrier(
                 best_dn = lo_excursion
                 bars_to_mae[i] = j - i
             if touched is None:
-                hit_up = high[j] >= up_barrier
-                hit_dn = low[j] <= dn_barrier
+                hit_up = high[j] >= long_up
+                hit_dn = low[j] <= long_dn
                 if hit_up and hit_dn:
-                    # Ambiguous within one bar; treat conservatively as the loss.
-                    touched = 0
+                    touched = 0  # ambiguous within one bar -> conservative loss
                 elif hit_up:
                     touched = 1
                 elif hit_dn:
                     touched = 0
+            if touched_short is None:
+                s_hit_dn = low[j] <= short_dn   # short profit target
+                s_hit_up = high[j] >= short_up  # short stop
+                if s_hit_dn and s_hit_up:
+                    touched_short = 0  # conservative loss for the short
+                elif s_hit_dn:
+                    touched_short = 1
+                elif s_hit_up:
+                    touched_short = 0
 
         mfe[i] = best_up if np.isfinite(best_up) else np.nan
         mae[i] = best_dn if np.isfinite(best_dn) else np.nan
         if touched is not None:
             label[i] = touched
+        if touched_short is not None:
+            label_short[i] = touched_short
 
     out["label_long"] = label
+    out["label_short"] = label_short
     out["mfe_atr"] = mfe
     out["mae_atr"] = mae
     out["bars_to_mfe"] = bars_to_mfe

@@ -55,10 +55,16 @@ features:
   vwap:
     # Distance normalisation uses the intraday ATR.
     atr_window: 14
+    # Volume-weighted standard-deviation bands around session VWAP.
+    band_sigmas: [1.0, 2.0]
   atr:
     window: 14
+    # 'wilder' (RMA, the classic Wilder ATR) or 'sma' (simple rolling mean).
+    method: "wilder"
   rvol:
     lookback_days: 20
+    # Winsorize RVOL at this upper cap to tame data-glitch spikes.
+    clip_max: 10.0
   volume_profile:
     bins: 80
     value_area_pct: 0.70

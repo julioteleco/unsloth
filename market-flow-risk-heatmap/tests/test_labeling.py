@@ -92,3 +92,44 @@ def test_last_bar_label_nan():
     out = label_triple_barrier(df, horizon_bars=12)
     # The final bar has no forward bars -> NaN label.
     assert np.isnan(out["label_long"].iloc[-1])
+
+
+def test_short_label_uses_mirrored_barriers():
+    # Entry 100, atr 1, upper=0.8 lower=0.5.
+    # Short profit barrier = 99.2, short stop = 100.5.
+    # Price falls to 99.0 (hits short profit) without hitting 100.5 -> label_short 1.
+    df = _frame(
+        closes=[100, 99.0, 99.0],
+        highs=[100, 99.3, 99.3],
+        lows=[100, 99.0, 99.0],
+        atr=1.0,
+    )
+    out = label_triple_barrier(df, upper_atr=0.8, lower_atr=0.5, horizon_bars=2)
+    assert out["label_short"].iloc[0] == 1
+    # The same down-move is a loss for a long (hits -0.5 ATR stop first).
+    assert out["label_long"].iloc[0] == 0
+
+
+def test_short_label_loss_on_rally():
+    # Price rallies through the short stop (100.5) first -> label_short 0.
+    df = _frame(
+        closes=[100, 101, 101],
+        highs=[100, 101.0, 101.0],
+        lows=[100, 100.6, 100.6],
+        atr=1.0,
+    )
+    out = label_triple_barrier(df, upper_atr=0.8, lower_atr=0.5, horizon_bars=2)
+    assert out["label_short"].iloc[0] == 0
+    assert out["label_long"].iloc[0] == 1
+
+
+def test_short_label_no_lookahead():
+    # Entry bar's own low spikes far down; future bars flat -> no short label.
+    df = _frame(
+        closes=[100, 100, 100],
+        highs=[100, 100, 100],
+        lows=[1, 100, 100],
+        atr=1.0,
+    )
+    out = label_triple_barrier(df, upper_atr=0.8, lower_atr=0.5, horizon_bars=2)
+    assert np.isnan(out["label_short"].iloc[0])
