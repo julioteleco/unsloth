@@ -1,0 +1,28 @@
+# Environment
+.env
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Data artifacts (keep directories via .gitkeep, ignore contents)
+data/raw/*
+data/processed/*
+data/features/*
+data/options_snapshots/*
+!data/**/.gitkeep
+*.parquet
+*.duckdb
+*.csv
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
