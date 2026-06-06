@@ -76,8 +76,15 @@ def compute_regime_features(
 
     macro = macro_snapshot or {}
     feats["term_spread_10y_2y"] = macro.get("TERM_SPREAD_10Y_2Y", np.nan)
+    feats["term_spread_10y_3m"] = macro.get("TERM_SPREAD_10Y_3M", np.nan)
     feats["yield_curve_inverted"] = bool(
         feats["term_spread_10y_2y"] < 0 if not np.isnan(feats["term_spread_10y_2y"]) else False
+    )
+    feats["hy_oas"] = macro.get("HY_OAS", np.nan)
+    feats["nfci"] = macro.get("NFCI", np.nan)
+    # Financial conditions tighter than neutral (>0) is a risk-off tailwind.
+    feats["financial_conditions_tight"] = bool(
+        feats["nfci"] > 0 if not np.isnan(feats["nfci"]) else False
     )
     feats["macro_available"] = bool(macro)
     return feats
@@ -98,15 +105,25 @@ def classify_regime(feats: dict) -> dict:
     risk_on = feats.get("risk_on_proxy", 0.0)
     vix_level = feats.get("vix_level", np.nan)
 
-    # High volatility dominates if VIX is both elevated and rising.
-    if (not np.isnan(vix_level) and vix_level >= 25) and vix_rising and vix_above_ma20:
-        reasons.append("VIX elevado y subiendo (>=25, sobre MA20)")
+    vix_backwardation = feats.get("volterm_vix_backwardation", False)
+    fin_tight = feats.get("financial_conditions_tight", False)
+
+    # High volatility dominates if VIX is elevated/rising OR the term structure is
+    # in backwardation (front-month fear above 3-month).
+    if ((not np.isnan(vix_level) and vix_level >= 25) and vix_rising and vix_above_ma20) \
+            or vix_backwardation:
+        if vix_backwardation:
+            reasons.append("estructura VIX en backwardation (VIX > VIX3M): estrés")
+        else:
+            reasons.append("VIX elevado y subiendo (>=25, sobre MA20)")
         return {"regime": "high_volatility", "reasons": reasons}
 
     if vix_rising and risk_on < 0 and not spy_up:
         reasons.append("VIX subiendo, crédito (HYG/TLT) débil y SPY bajo VWAP")
         if feats.get("yield_curve_inverted"):
             reasons.append("curva 10y-2y invertida (contexto macro de riesgo)")
+        if fin_tight:
+            reasons.append("condiciones financieras tensas (NFCI > 0)")
         return {"regime": "risk_off", "reasons": reasons}
 
     if spy_up and qqq_up and breadth_q >= 0.6 and not vix_above_ma20:

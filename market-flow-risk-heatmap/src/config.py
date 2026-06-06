@@ -32,9 +32,22 @@ def project_root() -> Path:
 # --------------------------------------------------------------------------- #
 class UniverseConfig(BaseModel):
     tickers: list[str]
+    sectors: list[str] = Field(default_factory=list)
+    vol_indices: list[str] = Field(default_factory=list)
+    extra_context: list[str] = Field(default_factory=list)
     futures_context: list[str] = Field(default_factory=list)
     primary_tickers: list[str] = Field(default_factory=list)
     options_tickers: list[str] = Field(default_factory=list)
+
+    def context_universe(self) -> list[str]:
+        """All tickers we fetch for cross-asset context (deduped, order-stable)."""
+        merged = [
+            *self.tickers,
+            *self.sectors,
+            *self.vol_indices,
+            *self.extra_context,
+        ]
+        return list(dict.fromkeys(merged))
 
 
 class DownloadConfig(BaseModel):
@@ -79,6 +92,13 @@ class BreadthConfig(BaseModel):
 class RegimeConfig(BaseModel):
     vix_ma_short: int = 5
     vix_ma_long: int = 20
+    vix_backwardation_threshold: float = 1.0
+
+
+class SeasonalityConfig(BaseModel):
+    fomc_dates: list[str] = Field(default_factory=list)
+    cpi_dates: list[str] = Field(default_factory=list)
+    closing_window_min: int = 30
 
 
 class FeaturesConfig(BaseModel):
@@ -88,6 +108,7 @@ class FeaturesConfig(BaseModel):
     volume_profile: VolumeProfileConfig = Field(default_factory=VolumeProfileConfig)
     breadth: BreadthConfig = Field(default_factory=BreadthConfig)
     regime: RegimeConfig = Field(default_factory=RegimeConfig)
+    seasonality: SeasonalityConfig = Field(default_factory=SeasonalityConfig)
 
 
 class ScoringLabels(BaseModel):

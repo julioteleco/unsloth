@@ -36,7 +36,8 @@ def main() -> int:
     parser.add_argument("--force", action="store_true", help="ignore cache and re-download")
     args = parser.parse_args()
 
-    tickers = args.tickers or cfg.universe.tickers
+    # Default to the full context universe (core + sectors + vol indices + extras).
+    tickers = args.tickers or cfg.universe.context_universe()
     log.info("Downloading %d tickers (%s / %s)", len(tickers), args.period, args.interval)
     data = download_ohlcv(tickers, period=args.period, interval=args.interval, force_refresh=args.force)
     ok = sum(1 for d in data.values() if d is not None and not d.empty)

@@ -16,6 +16,8 @@ from .features_breadth import breadth_quality_score, breadth_snapshot, build_bre
 from .features_options import compute_options_features
 from .features_regime import classify_regime, compute_regime_features
 from .features_rvol import calculate_rvol_by_session_minute
+from .features_seasonality import compute_seasonality_features
+from .features_vol_term import compute_vol_term_features
 from .features_volume_profile import (
     VolumeProfile,
     assign_profile_features,
@@ -81,8 +83,14 @@ def build_context(
     breadth = build_breadth_proxy(data_dict)
     snap = breadth_snapshot(breadth)
 
+    vol_term = compute_vol_term_features(data_dict)
+    seasonality = compute_seasonality_features(
+        primary_feats.index if primary_feats is not None and not primary_feats.empty else None
+    )
+
     vix_df = data_dict.get("^VIX", pd.DataFrame())
     regime_feats = compute_regime_features(primary_feats, qqq_feats, vix_df, snap, macro_snapshot)
+    regime_feats.update({f"volterm_{k}": v for k, v in vol_term.items()})
     regime = classify_regime(regime_feats)
     regime["features"] = regime_feats
 
@@ -93,9 +101,13 @@ def build_context(
         "vix_rising": regime_feats.get("vix_rising", False),
         "vix_level": regime_feats.get("vix_level", float("nan")),
         "term_spread_10y_2y": regime_feats.get("term_spread_10y_2y", float("nan")),
+        "vix_backwardation": vol_term.get("vix_backwardation", False),
+        "vix_term_ratio": vol_term.get("vix_term_ratio", float("nan")),
         "regime": regime.get("regime", "neutral"),
         "options": options_features or {"available": False},
         "macro": macro_snapshot or {},
+        "vol_term": vol_term,
+        "seasonality": seasonality,
     }
     return context, breadth, snap, regime
 
@@ -114,7 +126,8 @@ def build_ticker_bundle(
     dashboard can render directly.
     """
     cfg = load_config()
-    universe = list(dict.fromkeys([ticker, "QQQ", "SPY", *cfg.universe.tickers]))
+    # Full context universe: core + sectors + vol-structure indices + extras.
+    universe = list(dict.fromkeys([ticker, "QQQ", "SPY", *cfg.universe.context_universe()]))
     data_dict = download_ohlcv(universe, period=period, interval=interval, force_refresh=force_refresh)
 
     primary_df = data_dict.get(ticker, pd.DataFrame())

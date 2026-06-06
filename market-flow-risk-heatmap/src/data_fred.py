@@ -81,13 +81,31 @@ def download_fred_bundle(series_ids: Optional[list[str]] = None) -> dict[str, pd
 
 
 def latest_macro_snapshot(bundle: Optional[dict[str, pd.DataFrame]] = None) -> dict[str, float]:
-    """Return the latest value of each series plus a 10y-2y term-spread proxy."""
+    """Return the latest value of each FRED series plus derived risk gauges.
+
+    Derived fields (only when their inputs are present):
+        TERM_SPREAD_10Y_2Y   = DGS10 - DGS2     (curve slope; <0 = inverted)
+        TERM_SPREAD_10Y_3M   = DGS10 - DGS3MO   (Fed's preferred recession slope)
+        REAL_RATE_10Y        = DGS10 - T10YIE   (10y real yield proxy)
+        HY_OAS               = BAMLH0A0HYM2     (high-yield credit stress)
+        IG_OAS               = BAMLC0A0CM       (investment-grade credit stress)
+        NFCI / ANFCI         financial-conditions indices (>0 = tighter)
+    """
     if bundle is None:
         bundle = download_fred_bundle()
     snap: dict[str, float] = {}
     for sid, df in bundle.items():
         if df is not None and not df.empty:
             snap[sid] = float(df["value"].iloc[-1])
+
     if "DGS10" in snap and "DGS2" in snap:
         snap["TERM_SPREAD_10Y_2Y"] = snap["DGS10"] - snap["DGS2"]
+    if "DGS10" in snap and "DGS3MO" in snap:
+        snap["TERM_SPREAD_10Y_3M"] = snap["DGS10"] - snap["DGS3MO"]
+    if "DGS10" in snap and "T10YIE" in snap:
+        snap["REAL_RATE_10Y"] = snap["DGS10"] - snap["T10YIE"]
+    if "BAMLH0A0HYM2" in snap:
+        snap["HY_OAS"] = snap["BAMLH0A0HYM2"]
+    if "BAMLC0A0CM" in snap:
+        snap["IG_OAS"] = snap["BAMLC0A0CM"]
     return snap

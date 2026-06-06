@@ -19,6 +19,24 @@ universe:
     - GLD
     - USO
     - "^VIX"
+  # Full sector set (free via yfinance) for sector-rotation breadth.
+  sectors:
+    - XLY   # consumer discretionary (cyclical)
+    - XLP   # consumer staples (defensive)
+    - XLV   # health care
+    - XLI   # industrials
+    - XLU   # utilities (defensive)
+    - XLB   # materials
+    - XLRE  # real estate
+    - XLC   # communication services
+  # VIX term-structure / vol-of-vol indices (free via yfinance).
+  vol_indices:
+    - "^VIX9D"
+    - "^VIX3M"
+    - "^VVIX"
+  # Extra risk-appetite context (free via yfinance).
+  extra_context:
+    - "BTC-USD"   # 24/7 risk-appetite proxy
   # Optional futures used ONLY as context (never as the primary instrument).
   futures_context:
     - "ES=F"
@@ -45,10 +63,23 @@ download:
 
 fred:
   series:
-    - DGS10
-    - DGS2
-    - VIXCLS
-    - DTWEXBGS
+    # Rates / curve
+    - DGS10        # 10Y Treasury
+    - DGS2         # 2Y Treasury
+    - DGS3MO       # 3M T-bill (for 10y-3m recession spread)
+    - DFF          # effective fed funds rate
+    - T10YIE       # 10Y breakeven inflation
+    # Volatility / dollar
+    - VIXCLS       # VIX daily close (FRED cross-check)
+    - DTWEXBGS     # broad US dollar index
+    # Credit spreads (best free stress gauges)
+    - BAMLH0A0HYM2 # ICE BofA US High Yield OAS
+    - BAMLC0A0CM   # ICE BofA US Corporate (IG) OAS
+    # Financial conditions / liquidity
+    - NFCI         # Chicago Fed National Financial Conditions Index
+    - ANFCI        # adjusted NFCI
+    - WALCL        # Fed total assets (balance sheet)
+    - RRPONTSYD    # overnight reverse repo (liquidity drain)
   # FRED_API_KEY is read from the environment (.env). It is OPTIONAL.
 
 features:
@@ -73,16 +104,27 @@ features:
   breadth:
     # Numerator/denominator pairs for relative-strength ratios.
     ratios:
-      - ["RSP", "SPY"]
-      - ["SMH", "QQQ"]
-      - ["IWM", "SPY"]
-      - ["HYG", "TLT"]
-      - ["XLK", "SPY"]
-      - ["XLF", "SPY"]
+      - ["RSP", "SPY"]    # equal- vs cap-weight (breadth quality)
+      - ["SMH", "QQQ"]    # semis leadership
+      - ["IWM", "SPY"]    # small-cap risk appetite
+      - ["HYG", "TLT"]    # credit risk appetite
+      - ["XLK", "SPY"]    # tech leadership
+      - ["XLF", "SPY"]    # financials leadership
+      - ["XLY", "XLP"]    # cyclical vs defensive (classic risk-on/off)
+      - ["XLI", "XLU"]    # industrials vs utilities (cyclical vs defensive)
     return_windows: [1, 3, 12]
   regime:
     vix_ma_short: 5
     vix_ma_long: 20
+    # VIX term-structure ratio (VIX/VIX3M): >1 = backwardation = stress.
+    vix_backwardation_threshold: 1.0
+  seasonality:
+    # Optional known event dates (YYYY-MM-DD). Empty by default to avoid stale
+    # data; fill with FOMC / CPI / NFP dates if you want event-day flags.
+    fomc_dates: []
+    cpi_dates: []
+    # Minutes-before-close considered the "closing auction window".
+    closing_window_min: 30
 
 scoring:
   # Threshold cut points for converting a 0-100 score into a label.

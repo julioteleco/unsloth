@@ -203,20 +203,53 @@ def main() -> None:
     st.text(diag["summary"])
     st.caption(diag["disclaimer"])
 
+    # ----------------------------- VIX term structure -------------------- #
+    st.subheader("Estructura de volatilidad (VIX term structure)")
+    vt = bundle.context.get("vol_term", {})
+    if vt.get("vol_term_available"):
+        vcols = st.columns(4)
+        ratio = vt.get("vix_term_ratio", float("nan"))
+        state = "🔴 backwardation (estrés)" if vt.get("vix_backwardation") else "🟢 contango (calma)"
+        vcols[0].metric("VIX / VIX3M", f"{ratio:.3f}", state)
+        vcols[1].metric("VIX", f"{vt.get('vix_level', float('nan')):.2f}")
+        vcols[2].metric("VIX3M", f"{vt.get('vix3m_level', float('nan')):.2f}")
+        vvix = vt.get("vvix_level", float("nan"))
+        vcols[3].metric("VVIX (vol-de-vol)", f"{vvix:.1f}" if np.isfinite(vvix) else "n/d")
+    else:
+        st.info("VIX term structure no disponible (^VIX3M/^VIX9D sin datos en este entorno).")
+
     # ----------------------------- Breadth -------------------------------- #
     st.subheader("Breadth proxy (relative strength)")
+    breadth_keys = ["RSP/SPY", "SMH/QQQ", "IWM/SPY", "HYG/TLT", "XLY/XLP", "XLI/XLU",
+                    "XLK/SPY", "XLF/SPY"]
+    available_keys = [k for k in breadth_keys if k in bundle.breadth_snap]
     bcols = st.columns(4)
-    breadth_keys = ["RSP/SPY", "SMH/QQQ", "IWM/SPY", "HYG/TLT"]
-    for i, key in enumerate(breadth_keys):
+    for i, key in enumerate(available_keys):
         snap = bundle.breadth_snap.get(key)
-        with bcols[i]:
-            if snap:
-                trend = snap["ratio_trend"]
-                arrow = "🟢↑" if trend > 0 else ("🔴↓" if trend < 0 else "⚪→")
-                st.metric(key, f"{snap['ratio_close']:.4f}",
-                          f"{snap['ratio_return_3'] * 100:+.2f}% (3b) {arrow}")
-            else:
-                st.metric(key, "n/d")
+        with bcols[i % 4]:
+            trend = snap["ratio_trend"]
+            arrow = "🟢↑" if trend > 0 else ("🔴↓" if trend < 0 else "⚪→")
+            r3 = snap.get("ratio_return_3")
+            delta = f"{r3 * 100:+.2f}% (3b) {arrow}" if r3 is not None and np.isfinite(r3) else arrow
+            st.metric(key, f"{snap['ratio_close']:.4f}", delta)
+    st.caption("XLY/XLP y XLI/XLU = cíclico vs defensivo (apetito de riesgo).")
+
+    # ----------------------------- Seasonality / calendar ----------------- #
+    seas = bundle.context.get("seasonality", {})
+    if seas:
+        flags = []
+        if seas.get("is_opex"):
+            flags.append("🗓️ OPEX (vencimiento de opciones)")
+        if seas.get("is_quad_witching"):
+            flags.append("⚠️ Quad witching")
+        if seas.get("is_month_end_week"):
+            flags.append("📅 Semana de fin de mes")
+        if seas.get("is_closing_window"):
+            flags.append(f"🔔 Ventana de cierre ({seas.get('minutes_to_close')}m)")
+        if seas.get("is_event_day"):
+            flags.append("📢 Día de evento macro (FOMC/CPI)")
+        if flags:
+            st.caption("Estacionalidad: " + "  ·  ".join(flags))
 
     # ----------------------------- Options -------------------------------- #
     if use_options:
