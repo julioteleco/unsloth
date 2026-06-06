@@ -76,6 +76,19 @@ Si no hay `FRED_API_KEY`, el sistema funciona **solo con yfinance** sin romperse
 
 ## Instalación
 
+### Opción rápida (un comando)
+
+```bash
+bash install.sh                 # Mac / Linux
+# Windows PowerShell:
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+El script crea el virtualenv `.venv`, instala dependencias, copia `.env.example`
+a `.env` y ejecuta los tests.
+
+### Opción manual
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate   # Mac/Linux  (Windows: .venv\Scripts\activate)
