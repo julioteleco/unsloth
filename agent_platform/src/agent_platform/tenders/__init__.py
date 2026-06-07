@@ -1,10 +1,21 @@
 """Aplicación del núcleo a licitaciones públicas (LCSP 9/2017).
 
-Worker "Redactor de pliegos": config-as-data del pliego + motor de reglas LCSP
-+ cálculo auditable y publicación con gate, sobre el núcleo de agent_platform.
+Cubre el ciclo completo:
+- Redacción de pliegos: `PliegoSpec` (config-as-data) + `validar` + `redactar` / `publicar`.
+- Revisión/evaluación de ofertas: `Oferta` + `evaluar` + `proponer_adjudicacion`.
 """
 from __future__ import annotations
 
+from .evaluacion import (
+    Oferta,
+    OfertaValorada,
+    PropuestaAdjudicacion,
+    ResultadoEvaluacion,
+    admisibilidad,
+    evaluar,
+    proponer_adjudicacion,
+    umbral_anormalidad,
+)
 from .lcsp import validar
 from .models import (
     Criterio,
@@ -22,13 +33,21 @@ __all__ = [
     "Criterio",
     "Hallazgo",
     "InformeValidacion",
+    "Oferta",
+    "OfertaValorada",
     "PliegoSpec",
     "Procedimiento",
+    "PropuestaAdjudicacion",
+    "ResultadoEvaluacion",
     "ResultadoRedaccion",
     "Severidad",
     "TipoContrato",
     "TipoCriterio",
+    "admisibilidad",
+    "evaluar",
+    "proponer_adjudicacion",
     "publicar",
     "redactar",
+    "umbral_anormalidad",
     "validar",
 ]

@@ -62,9 +62,40 @@ make demo-licitacion    # python examples/licitacion_demo.py
   referencias a artículos orientan, no son asesoramiento jurídico.
 - `VERIFIED` es tan bueno como la honestidad de los inputs (§12 de la arquitectura).
 
-## Siguiente paso natural
+## Worker "Evaluación de ofertas" (revisión)
 
-El worker de **revisión/evaluación** (admisibilidad, cálculo económico con baja
-temeraria, evaluación técnica asistida con gate de mesa) reutiliza exactamente
-estas mismas piezas: reglas como policy, cifras `PURE`→`REPRODUCED`, juicio de
-valor `VERIFIED`, ofertas *tainted* y acta de valoración en el Chain-of-Work.
+`agent_platform.tenders` (módulo `evaluacion.py`) cubre el flujo de la mesa de
+contratación, reutilizando las mismas piezas del núcleo:
+
+- **`Oferta`**: la oferta de un licitador. Es **dato externo → entra *tainted***.
+- **`admisibilidad(oferta)`**: sobre administrativo — prohibición de contratar
+  (art. 71) y documentación completa → motivo de exclusión o `None`.
+- **`evaluar(spec, ofertas)`**:
+  1. excluye las no admisibles,
+  2. puntúa lo económico con la fórmula (proporcional a la más baja) como tool
+     `PURE` → `REPRODUCED`,
+  3. suma la puntuación técnica (juicio de valor, input del comité),
+  4. marca las **bajas anormalmente bajas** (art. 149) — no las excluye: exigen
+     audiencia y justificación (art. 149.4),
+  5. clasifica las ofertas por puntuación total.
+- **`proponer_adjudicacion(resultado, gate_token)`**: acto `EFFECTFUL`. Como el
+  importe deriva de la oferta del licitador (*tainted*), el núcleo exige gate por
+  **doble vía** (effectful + tainted): no se puede auto-adjudicar a partir de
+  cifras aportadas por un licitador. Queda `VERIFIED` en el log.
+
+```bash
+make demo-evaluacion
+```
+
+El umbral de baja anormal (`umbral_puntos`) es **configurable**: el art. 149.2
+remite a los parámetros objetivos del pliego (RGLCAP art. 85 como referencia).
+
+## CLI
+
+```bash
+python -m agent_platform.tenders validar pliego.json
+```
+
+Valida un `PliegoSpec` en JSON contra la LCSP y devuelve el informe; código de
+salida 0 (conforme), 1 (errores) o 2 (entrada inválida). Útil en hooks de CI
+sobre los pliegos versionados en git.

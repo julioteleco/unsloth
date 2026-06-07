@@ -20,41 +20,9 @@ from ..contracts import AuditEvent, Lit, Meta, Plan, Ref, Step
 from ..errors import PolicyError
 from ..execution import execute
 from ..replay import Verdict, replay
-from ..tools import REGISTRY, Tool, ToolKind
+from ._runtime import META_DEFECTO, ReasonerNulo
 from .lcsp import validar
 from .models import InformeValidacion, PliegoSpec
-
-
-# === Herramientas del dominio: registradas en el registry tipado del núcleo ===
-def _registrar_herramientas() -> None:
-    REGISTRY.setdefault(
-        "pct", Tool("pct", ToolKind.PURE, lambda a: a["base"] * a["rate"] / Decimal(100)))
-    REGISTRY.setdefault(
-        "con_iva", Tool("con_iva", ToolKind.PURE,
-                        lambda a: a["base"] * (Decimal(1) + a["iva"] / Decimal(100))))
-    REGISTRY.setdefault(
-        "publicar_pliego",
-        Tool("publicar_pliego", ToolKind.EFFECTFUL, lambda a: a["pbl"], requires_gate=True))
-
-
-_registrar_herramientas()
-
-_META = Meta(model_version="tenders-redactor-1", temperature=0.0, seed=0,
-             prompt_hash="pliego:lcsp", retrieved_hashes=(), sandbox_version="n/a")
-
-
-class _ReasonerNulo:
-    """Sin reparación automática: la redacción de pliegos no auto-corrige actos
-    jurídicos. Si un paso falla, escala a la persona, no inventa un arreglo."""
-    model_version = "tenders-redactor-1"
-    temperature = 0.0
-    seed: int | None = 0
-
-    def plan(self, goal: str) -> Plan:
-        return Plan(goal=goal, steps=[])
-
-    def repair(self, step: Step, error: str) -> Step:
-        return step  # no-op: re-validado por policy en la siguiente vuelta
 
 
 @dataclass(frozen=True)
@@ -88,7 +56,7 @@ def redactar(spec: PliegoSpec, meta: Meta | None = None) -> ResultadoRedaccion:
     if not informe.conforme:
         return ResultadoRedaccion(informe, False, {}, [], "", {})
     plan = Plan(goal=f"Calcular cifras del pliego: {spec.objeto}", steps=_pasos_calculo(spec))
-    importes, log, seal = execute(plan, _ReasonerNulo(), meta or _META)
+    importes, log, seal = execute(plan, ReasonerNulo(), meta or META_DEFECTO)
     return ResultadoRedaccion(informe, False, importes, log, seal, replay(log, seal))
 
 
@@ -109,5 +77,5 @@ def publicar(spec: PliegoSpec, gate_token: str, meta: Meta | None = None) -> Res
     pasos.append(Step(id="publicar_pliego", op="publicar_pliego",
                       args={"pbl": Ref(source="pbl_con_iva")}, gate_token=gate_token))
     plan = Plan(goal=f"Publicar pliego: {spec.objeto}", steps=pasos)
-    importes, log, seal = execute(plan, _ReasonerNulo(), meta or _META)
+    importes, log, seal = execute(plan, ReasonerNulo(), meta or META_DEFECTO)
     return ResultadoRedaccion(informe, True, importes, log, seal, replay(log, seal))

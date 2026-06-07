@@ -79,9 +79,15 @@ validación de pliegos** de contratación pública española:
   veredicto `REPRODUCED`.
 - **Publicación con gate firmado** (`publicar`): acto `EFFECTFUL` → `VERIFIED`,
   bloqueado sin firma del órgano de contratación o si el pliego no es conforme.
+- **Evaluación de ofertas** (`evaluar`, `proponer_adjudicacion`): admisibilidad,
+  puntuación económica `PURE`→`REPRODUCED`, juicio de valor, detección de baja
+  anormal (art. 149) y propuesta de adjudicación con gate de la mesa. Las ofertas
+  entran *tainted*, así que la adjudicación nunca se dispara sin firma.
+- **CLI**: `python -m agent_platform.tenders validar pliego.json`.
 
 ```bash
-make demo-licitacion
+make demo-licitacion     # redacción + validación + publicación
+make demo-evaluacion     # admisibilidad + puntuación + adjudicación
 ```
 
 Detalle y límites legales en `docs/licitaciones.md`.
