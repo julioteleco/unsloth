@@ -67,8 +67,16 @@ Sin `make`, los comandos equivalentes son `ruff check src tests examples`,
 `mypy`, `pytest -q` y `python examples/demo.py`. CI los corre en cada push/PR
 que toque `agent_platform/` (`.github/workflows/agent_platform-ci.yml`).
 
-**Instalación local** (venv, extras opcionales, comando de consola `licita`,
-build de wheel): ver [`INSTALL.md`](INSTALL.md).
+**Instalación desde otro equipo** — un comando (clona, crea venv, instala y
+verifica):
+
+```bash
+git clone https://github.com/julioteleco/unsloth.git
+cd unsloth/agent_platform && ./bootstrap.sh
+```
+
+Detalle (extras `crypto/llm/postgres/notion`, instalación directa desde git,
+comando `licita`, build de wheel, troubleshooting): ver [`INSTALL.md`](INSTALL.md).
 
 ### Planner real y herramientas con efecto
 
