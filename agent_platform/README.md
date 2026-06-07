@@ -94,6 +94,7 @@ make demo-licitacion       # redacción + validación + publicación
 make demo-evaluacion       # admisibilidad + puntuación + adjudicación
 make demo-persistencia     # publicar -> guardar -> recargar -> re-verificar
 make demo-juicio-valor     # LLM (motor de demo) -> evaluar -> adjudicar
+make demo-notion           # expediente en Notion + tamper detectado al recargar
 ```
 
 Detalle y límites legales en `docs/licitaciones.md`.

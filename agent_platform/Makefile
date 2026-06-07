@@ -1,5 +1,5 @@
 .PHONY: install lint typecheck test demo demo-licitacion demo-evaluacion \
-	demo-persistencia demo-juicio-valor check
+	demo-persistencia demo-juicio-valor demo-notion check
 
 PYTHON ?= python3
 
@@ -30,5 +30,8 @@ demo-persistencia:
 
 demo-juicio-valor:
 	$(PYTHON) examples/juicio_valor_demo.py
+
+demo-notion:
+	$(PYTHON) examples/notion_store_demo.py
 
 check: lint typecheck test
