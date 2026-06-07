@@ -1,0 +1,63 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+licita = "agent_platform.tenders.__main__:main"
+
+[project]
+name = "agent-platform-core"
+version = "3.0.0"
+description = "Núcleo del contrato (§4) de la plataforma de agentes empresariales: ejecución tipada, auditable y tamper-evident con taint derivada por procedencia."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = [
+    "pydantic>=2.5,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.8",
+    "pytest>=7.4",
+    "ruff>=0.5",
+    "cryptography>=42",      # para ejercitar Ed25519Sealer en los tests
+]
+crypto = [
+    "cryptography>=42",      # Ed25519Sealer (ancla asimétrica)
+]
+llm = [
+    "anthropic>=0.40",       # adaptador de juicio de valor con Claude
+]
+postgres = [
+    "psycopg[binary]>=3.1",  # PostgresEventStore (sistema de registro)
+]
+notion = [
+    "notion-client>=2.0",    # NotionEventStore (mirror / piloto)
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_platform"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+mypy_path = "src"
+packages = ["agent_platform"]
+
+# Dependencias opcionales con import perezoso: no instaladas en CI.
+[[tool.mypy.overrides]]
+module = ["anthropic.*", "psycopg.*", "notion_client.*", "cryptography.*"]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "examples"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF"]
