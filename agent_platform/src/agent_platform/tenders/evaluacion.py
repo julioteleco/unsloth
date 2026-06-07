@@ -34,7 +34,8 @@ class Oferta(BaseModel):
     importe: Decimal                          # oferta económica (sin IVA)
     docs_completos: bool = True               # sobre administrativo en regla
     prohibicion_contratar: bool = False       # art. 71 LCSP
-    puntuacion_tecnica: Decimal = Decimal(0)  # juicio de valor (input del comité)
+    puntuacion_tecnica: Decimal = Decimal(0)  # juicio de valor (input del comité/LLM)
+    memoria_tecnica: str = ""                 # texto del sobre técnico (dato externo)
 
 
 @dataclass(frozen=True)

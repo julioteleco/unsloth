@@ -84,13 +84,34 @@ validación de pliegos** de contratación pública española:
   anormal (art. 149) y propuesta de adjudicación con gate de la mesa. Las ofertas
   entran *tainted*, así que la adjudicación nunca se dispara sin firma.
 - **CLI**: `python -m agent_platform.tenders validar pliego.json`.
+- **Juicio de valor con LLM real** (`EvaluadorAnthropic`, opcional `[llm]`): un
+  modelo Claude asiste la puntuación de criterios subjetivos; la memoria del
+  licitador se trata como dato no confiable y la mesa asume la puntuación con su
+  firma (`VERIFIED`, nunca `REPRODUCED`).
 
 ```bash
-make demo-licitacion     # redacción + validación + publicación
-make demo-evaluacion     # admisibilidad + puntuación + adjudicación
+make demo-licitacion       # redacción + validación + publicación
+make demo-evaluacion       # admisibilidad + puntuación + adjudicación
+make demo-persistencia     # publicar -> guardar -> recargar -> re-verificar
+make demo-juicio-valor     # LLM (motor de demo) -> evaluar -> adjudicar
 ```
 
 Detalle y límites legales en `docs/licitaciones.md`.
+
+## Persistencia del Chain-of-Work
+
+El log hash-encadenado se vuelca a un almacén durable y se recarga para
+re-verificar la cadena y el sello tras un reinicio (`EventStore`):
+
+- **`SqliteEventStore`** — stdlib, cero dependencias, append-only, testeado.
+- **`PostgresEventStore`** — el sistema de registro de la arquitectura (§3/§5);
+  misma interfaz, opcional `[postgres]` (psycopg).
+
+```python
+store = SqliteEventStore("expedientes.db")
+store.guardar("LIC-2026-001", res.log, res.seal)
+log, seal = store.cargar("LIC-2026-001")   # re-verificable con verify_chain/replay
+```
 
 ## Límites honestos
 

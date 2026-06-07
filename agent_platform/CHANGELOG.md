@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Añadido (persistencia + LLM real)
+- **Persistencia del Chain-of-Work** (`agent_platform.persistence`): `EventStore`
+  con `SqliteEventStore` (stdlib, testeado, append-only) y `PostgresEventStore`
+  (sistema de registro, opcional `[postgres]`). El expediente se recarga y se
+  re-verifica (cadena + sello) tras un reinicio.
+- **Juicio de valor con LLM real**: `EvaluadorAnthropic` (Claude Opus 4.8, vía
+  `messages.parse` con salida estructurada, opcional `[llm]`) implementa
+  `MotorJuicioValor`; `evaluar_ofertas_con_llm` puebla la puntuación técnica. La
+  memoria del licitador se trata como dato no confiable (anti-inyección) y la
+  adjudicación derivada sigue exigiendo gate de la mesa (`VERIFIED`).
+- Demos `persistencia_demo.py` y `juicio_valor_demo.py` (offline), 8 tests nuevos
+  (46 en total), overrides de mypy para dependencias opcionales.
+
 ### Añadido
 - Subpaquete `agent_platform.tenders`: aplicación del núcleo a **licitaciones
   públicas (LCSP 9/2017)**, cubriendo el ciclo completo.

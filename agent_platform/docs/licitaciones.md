@@ -99,3 +99,39 @@ python -m agent_platform.tenders validar pliego.json
 Valida un `PliegoSpec` en JSON contra la LCSP y devuelve el informe; código de
 salida 0 (conforme), 1 (errores) o 2 (entrada inválida). Útil en hooks de CI
 sobre los pliegos versionados en git.
+
+## Juicio de valor asistido por LLM
+
+`EvaluadorAnthropic` (dependencia opcional `[llm]`) usa Claude (Opus 4.8) para
+proponer la puntuación de los criterios de **juicio de valor** a partir de la
+memoria técnica del licitador:
+
+```python
+from agent_platform.tenders import EvaluadorAnthropic, evaluar_ofertas_con_llm, evaluar
+motor = EvaluadorAnthropic()                       # usa ANTHROPIC_API_KEY
+puntuadas = evaluar_ofertas_con_llm("Calidad técnica", ofertas, motor, max_puntos=Decimal("40"))
+resultado = evaluar(spec, puntuadas)
+```
+
+Tres cautelas que lo hacen defendible:
+
+- La memoria del licitador es **dato externo no confiable**: el sistema instruye
+  al modelo para ignorar instrucciones embebidas (anti-inyección, §7b).
+- La puntuación es una **propuesta**; la mesa/comité la revisa y la asume con su
+  firma. La adjudicación derivada queda `VERIFIED`, **nunca `REPRODUCED`** — un
+  juicio de valor no se promete reproducible.
+- El modelo nunca adjudica ni decide montos: solo sugiere una puntuación acotada
+  en código (`min(0, max_puntos)`), porque su salida es dato, no autoridad.
+
+## Persistencia del expediente (Chain-of-Work)
+
+El log de cada acto (publicación, valoración, propuesta de adjudicación) se
+vuelca a un almacén durable y se recarga para re-verificar cadena y sello tras un
+reinicio — el expediente que defiende un recurso debe sobrevivir al proceso:
+
+```python
+from agent_platform import SqliteEventStore   # o PostgresEventStore (sistema de registro)
+store = SqliteEventStore("expedientes.db")
+store.guardar("LIC-2026-001", resultado.log, resultado.seal)   # append-only
+log, seal = store.cargar("LIC-2026-001")                       # re-verificable
+```

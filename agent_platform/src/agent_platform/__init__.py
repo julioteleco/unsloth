@@ -20,6 +20,7 @@ from .contracts import (
 )
 from .errors import Budget, Escalation, IntegrityError, PolicyError
 from .execution import execute
+from .persistence import EventStore, PostgresEventStore, SqliteEventStore
 from .policy import authorize
 from .reasoning import ReasoningEngine
 from .replay import Verdict, replay
@@ -32,13 +33,16 @@ __all__ = [
     "AuditEvent",
     "Budget",
     "Escalation",
+    "EventStore",
     "IntegrityError",
     "Lit",
     "Meta",
     "Plan",
     "PolicyError",
+    "PostgresEventStore",
     "ReasoningEngine",
     "Ref",
+    "SqliteEventStore",
     "Step",
     "Tool",
     "ToolKind",

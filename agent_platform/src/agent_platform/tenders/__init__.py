@@ -17,6 +17,12 @@ from .evaluacion import (
     umbral_anormalidad,
 )
 from .lcsp import validar
+from .llm import (
+    EvaluacionTecnica,
+    EvaluadorAnthropic,
+    MotorJuicioValor,
+    evaluar_ofertas_con_llm,
+)
 from .models import (
     Criterio,
     Hallazgo,
@@ -31,8 +37,11 @@ from .worker import ResultadoRedaccion, publicar, redactar
 
 __all__ = [
     "Criterio",
+    "EvaluacionTecnica",
+    "EvaluadorAnthropic",
     "Hallazgo",
     "InformeValidacion",
+    "MotorJuicioValor",
     "Oferta",
     "OfertaValorada",
     "PliegoSpec",
@@ -45,6 +54,7 @@ __all__ = [
     "TipoCriterio",
     "admisibilidad",
     "evaluar",
+    "evaluar_ofertas_con_llm",
     "proponer_adjudicacion",
     "publicar",
     "redactar",

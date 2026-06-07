@@ -19,6 +19,12 @@ dev = [
     "pytest>=7.4",
     "ruff>=0.5",
 ]
+llm = [
+    "anthropic>=0.40",       # adaptador de juicio de valor con Claude
+]
+postgres = [
+    "psycopg[binary]>=3.1",  # PostgresEventStore (sistema de registro)
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agent_platform"]
@@ -32,6 +38,11 @@ strict = true
 python_version = "3.11"
 mypy_path = "src"
 packages = ["agent_platform"]
+
+# Dependencias opcionales con import perezoso: no instaladas en CI.
+[[tool.mypy.overrides]]
+module = ["anthropic.*", "psycopg.*"]
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 100
