@@ -97,7 +97,8 @@ make demo-juicio-valor     # LLM (motor de demo) -> evaluar -> adjudicar
 make demo-notion           # expediente en Notion + tamper detectado al recargar
 ```
 
-Detalle y límites legales en `docs/licitaciones.md`.
+Detalle y límites legales en `docs/licitaciones.md`. Material de venta
+(one-pager, deck, guion de demo) en `docs/venta/`.
 
 ## Persistencia del Chain-of-Work
 
