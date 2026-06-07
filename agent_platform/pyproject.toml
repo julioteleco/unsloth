@@ -18,6 +18,10 @@ dev = [
     "mypy>=1.8",
     "pytest>=7.4",
     "ruff>=0.5",
+    "cryptography>=42",      # para ejercitar Ed25519Sealer en los tests
+]
+crypto = [
+    "cryptography>=42",      # Ed25519Sealer (ancla asimétrica)
 ]
 llm = [
     "anthropic>=0.40",       # adaptador de juicio de valor con Claude
@@ -44,7 +48,7 @@ packages = ["agent_platform"]
 
 # Dependencias opcionales con import perezoso: no instaladas en CI.
 [[tool.mypy.overrides]]
-module = ["anthropic.*", "psycopg.*", "notion_client.*"]
+module = ["anthropic.*", "psycopg.*", "notion_client.*", "cryptography.*"]
 ignore_missing_imports = true
 
 [tool.ruff]

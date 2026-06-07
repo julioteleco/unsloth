@@ -21,8 +21,10 @@ Implementación del **contrato del núcleo (§4)** del documento de arquitectura
    declara. Un dato recuperado *tainted* no dispara un efecto sin gate, ni
    directamente ni a través de pasos derivados.
 4. **Camino de reparación re-autorizado** — una reparación maliciosa no evade la policy.
-5. **Log tamper-evident** — hash-encadenado y sellado con un ancla externa, no un
-   simple append-only.
+5. **Log tamper-evident** — hash-encadenado y sellado con un ancla externa
+   (`Sealer`): `HmacSealer` por defecto, o **`Ed25519Sealer`** (firma asimétrica,
+   `[crypto]`) donde el verificador solo necesita la clave pública y nadie puede
+   falsificar un sello sin la privada.
 
 ## Estructura (capas desacopladas)
 

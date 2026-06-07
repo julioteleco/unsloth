@@ -10,6 +10,7 @@ from enum import StrEnum
 
 from .audit import verify_chain
 from .contracts import AuditEvent
+from .sealing import Sealer
 from .tools import REGISTRY, ToolKind, _hash
 
 
@@ -19,8 +20,8 @@ class Verdict(StrEnum):
     UNREPLAYABLE = "unreplayable"  # paso fallido, sin evidencia, o cadena rota
 
 
-def replay(log: list[AuditEvent], seal: str) -> dict[str, Verdict]:
-    intact = verify_chain(log, seal)
+def replay(log: list[AuditEvent], seal: str, sealer: Sealer | None = None) -> dict[str, Verdict]:
+    intact = verify_chain(log, seal, sealer)
     verdicts: dict[str, Verdict] = {}
     for e in log:
         if e.step_id not in intact or e.error is not None or e.output is None:

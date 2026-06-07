@@ -29,7 +29,7 @@ from .persistence import (
 from .policy import authorize
 from .reasoning import ReasoningEngine
 from .replay import Verdict, replay
-from .sealing import seal_head
+from .sealing import Ed25519Sealer, HmacSealer, Sealer, seal_head
 from .tools import REGISTRY, Tool, ToolKind
 
 __all__ = [
@@ -37,8 +37,10 @@ __all__ = [
     "Arg",
     "AuditEvent",
     "Budget",
+    "Ed25519Sealer",
     "Escalation",
     "EventStore",
+    "HmacSealer",
     "IntegrityError",
     "Lit",
     "Meta",
@@ -48,6 +50,7 @@ __all__ = [
     "PostgresEventStore",
     "ReasoningEngine",
     "Ref",
+    "Sealer",
     "SqliteEventStore",
     "Step",
     "Tool",

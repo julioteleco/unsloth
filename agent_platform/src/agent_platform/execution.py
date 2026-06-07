@@ -13,7 +13,7 @@ from .contracts import AuditEvent, Meta, Plan, Step, Value
 from .errors import Budget, Escalation, PolicyError
 from .policy import _resolve, authorize
 from .reasoning import ReasoningEngine
-from .sealing import seal_head
+from .sealing import _DEFAULT_SEALER, Sealer
 from .tools import REGISTRY, Tool, ToolKind, _hash
 
 
@@ -67,8 +67,10 @@ def _run_step(step: Step, reasoner: ReasoningEngine, meta: Meta,
 
 def execute(plan: Plan, reasoner: ReasoningEngine, meta: Meta,
             retrieved: Mapping[str, Value] | None = None,
-            budget: Budget | None = None) -> tuple[dict[str, Decimal], list[AuditEvent], str]:
+            budget: Budget | None = None,
+            sealer: Sealer | None = None) -> tuple[dict[str, Decimal], list[AuditEvent], str]:
     budget = budget or Budget()
+    s = sealer if sealer is not None else _DEFAULT_SEALER
     values: dict[str, Value] = dict(retrieved or {})  # datos recuperados entran TAINTED
     results: dict[str, Decimal] = {}
     log: list[AuditEvent] = []
@@ -77,4 +79,4 @@ def execute(plan: Plan, reasoner: ReasoningEngine, meta: Meta,
         out, prev_hash = _run_step(step, reasoner, meta, values, budget, log, prev_hash)
         values[step.id] = out          # la salida queda disponible (con su taint) para refs
         results[step.id] = out.amount
-    return results, log, seal_head(prev_hash)
+    return results, log, s.firmar(prev_hash)

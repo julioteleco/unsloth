@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Añadido (ancla externa real)
+- **Sello pluggable** (`Sealer` Protocol): `HmacSealer` (default, simétrico, cero
+  dependencias) y **`Ed25519Sealer`** (firma asimétrica, opcional `[crypto]`). El
+  verificador de Ed25519 solo necesita la **clave pública**, así que un atacante
+  con acceso total de lectura no puede falsificar un sello — la "firma asimétrica"
+  que §6 pide. `execute`/`verify_chain`/`replay` aceptan `sealer=` (default HMAC,
+  retrocompatible). 6 tests nuevos, incl. falsificación imposible sin clave privada.
+
 ### Añadido (persistencia + LLM real)
 - **Persistencia del Chain-of-Work** (`agent_platform.persistence`): `EventStore`
   con `SqliteEventStore` (stdlib, testeado, append-only), `PostgresEventStore`
