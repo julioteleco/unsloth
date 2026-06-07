@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Añadido
+- Subpaquete `agent_platform.tenders`: aplicación del núcleo a **licitaciones
+  públicas (LCSP 9/2017)**, worker "Redactor de pliegos".
+  - `PliegoSpec` config-as-data (Pydantic), versionable en git.
+  - Motor de reglas LCSP (`validar`) → `InformeValidacion` con hallazgos
+    referenciados al articulado.
+  - `redactar` calcula cifras `PURE` (garantía, PBL con IVA) → `REPRODUCED`.
+  - `publicar` como acto `EFFECTFUL` con gate firmado → `VERIFIED`.
+  - 13 tests del worker, demo (`examples/licitacion_demo.py`), `docs/licitaciones.md`.
+
 ## [3.0.0] — Núcleo del contrato (§4)
 
 Primera implementación del esqueleto runnable del invariante central, derivado

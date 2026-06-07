@@ -65,6 +65,27 @@ Sin `make`, los comandos equivalentes son `ruff check src tests examples`,
 `mypy`, `pytest -q` y `python examples/demo.py`. CI los corre en cada push/PR
 que toque `agent_platform/` (`.github/workflows/agent_platform-ci.yml`).
 
+## Aplicación incluida: licitaciones públicas (LCSP 9/2017)
+
+El subpaquete `agent_platform.tenders` aplica el núcleo a la **redacción y
+validación de pliegos** de contratación pública española:
+
+- **Config-as-data** del pliego (`PliegoSpec`), versionable en git.
+- **Motor de reglas LCSP** (`validar`) → informe de hallazgos (ERROR/AVISO) con
+  referencia al articulado (suma de criterios = 100, comité de expertos si el
+  juicio de valor supera a la fórmula, garantía 5%, condición especial de
+  ejecución, plazos mínimos…).
+- **Cifras auditables** (`redactar`): garantía y PBL con IVA son tools `PURE` →
+  veredicto `REPRODUCED`.
+- **Publicación con gate firmado** (`publicar`): acto `EFFECTFUL` → `VERIFIED`,
+  bloqueado sin firma del órgano de contratación o si el pliego no es conforme.
+
+```bash
+make demo-licitacion
+```
+
+Detalle y límites legales en `docs/licitaciones.md`.
+
 ## Límites honestos
 
 Esto certifica *qué pasó*, no que el planner sea determinista. No promete "IA

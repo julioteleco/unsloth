@@ -1,4 +1,4 @@
-.PHONY: install lint typecheck test demo check
+.PHONY: install lint typecheck test demo demo-licitacion check
 
 PYTHON ?= python3
 
@@ -17,5 +17,8 @@ test:
 
 demo:
 	$(PYTHON) examples/demo.py
+
+demo-licitacion:
+	$(PYTHON) examples/licitacion_demo.py
 
 check: lint typecheck test
