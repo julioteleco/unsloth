@@ -78,6 +78,10 @@ cd unsloth/agent_platform && ./bootstrap.sh
 Detalle (extras `crypto/llm/postgres/notion`, instalación directa desde git,
 comando `licita`, build de wheel, troubleshooting): ver [`INSTALL.md`](INSTALL.md).
 
+**Mover a un repo privado propio** (este repo es un fork público; extrae
+`agent_platform/` con su historial a un repo privado donde el paquete es la raíz):
+`scripts/migrar-a-privado.sh` — ver [`docs/migrar-a-privado.md`](docs/migrar-a-privado.md).
+
 ### Planner real y herramientas con efecto
 
 - **`ClaudePlanner`** (`[llm]`): Reasoning Engine sobre Claude (Opus 4.8). Emite
