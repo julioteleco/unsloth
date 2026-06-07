@@ -4,9 +4,11 @@
 
 ### Añadido (persistencia + LLM real)
 - **Persistencia del Chain-of-Work** (`agent_platform.persistence`): `EventStore`
-  con `SqliteEventStore` (stdlib, testeado, append-only) y `PostgresEventStore`
-  (sistema de registro, opcional `[postgres]`). El expediente se recarga y se
-  re-verifica (cadena + sello) tras un reinicio.
+  con `SqliteEventStore` (stdlib, testeado, append-only), `PostgresEventStore`
+  (sistema de registro, opcional `[postgres]`) y `NotionEventStore` (almacén/mirror
+  en Notion, opcional `[notion]`; mutable y no-WORM pero tamper-evident porque el
+  sello se firma fuera de Notion). El expediente se recarga y se re-verifica
+  (cadena + sello) tras un reinicio.
 - **Juicio de valor con LLM real**: `EvaluadorAnthropic` (Claude Opus 4.8, vía
   `messages.parse` con salida estructurada, opcional `[llm]`) implementa
   `MotorJuicioValor`; `evaluar_ofertas_con_llm` puebla la puntuación técnica. La

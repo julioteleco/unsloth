@@ -135,3 +135,17 @@ store = SqliteEventStore("expedientes.db")
 store.guardar("LIC-2026-001", resultado.log, resultado.seal)   # append-only
 log, seal = store.cargar("LIC-2026-001")                       # re-verificable
 ```
+
+**Notion como almacén/mirror** (`NotionEventStore`, opcional `[notion]`): vuelca
+el expediente a una base de datos de Notion para que la mesa lo revise en una UI
+familiar. Notion es mutable y no-WORM, pero la tamper-evidence se mantiene — el
+sello se firma con una clave del runtime que no se almacena en Notion, así que
+cualquier edición se detecta al recargar con `verify_chain`. Para expediente
+regulado, mantén Postgres/WORM como autoritativo y usa Notion solo como espejo.
+
+```python
+from agent_platform import NotionEventStore
+store = NotionEventStore(database_id="...")   # NOTION_TOKEN en el entorno
+store.guardar("LIC-2026-001", resultado.log, resultado.seal)
+```
+

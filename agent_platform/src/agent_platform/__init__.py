@@ -20,7 +20,12 @@ from .contracts import (
 )
 from .errors import Budget, Escalation, IntegrityError, PolicyError
 from .execution import execute
-from .persistence import EventStore, PostgresEventStore, SqliteEventStore
+from .persistence import (
+    EventStore,
+    NotionEventStore,
+    PostgresEventStore,
+    SqliteEventStore,
+)
 from .policy import authorize
 from .reasoning import ReasoningEngine
 from .replay import Verdict, replay
@@ -37,6 +42,7 @@ __all__ = [
     "IntegrityError",
     "Lit",
     "Meta",
+    "NotionEventStore",
     "Plan",
     "PolicyError",
     "PostgresEventStore",

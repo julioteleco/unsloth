@@ -106,6 +106,10 @@ re-verificar la cadena y el sello tras un reinicio (`EventStore`):
 - **`SqliteEventStore`** — stdlib, cero dependencias, append-only, testeado.
 - **`PostgresEventStore`** — el sistema de registro de la arquitectura (§3/§5);
   misma interfaz, opcional `[postgres]` (psycopg).
+- **`NotionEventStore`** — Notion como almacén/mirror (opcional `[notion]`).
+  Mutable y no-WORM, pero **tamper-evident**: el sello se firma con una clave del
+  runtime que no se guarda en Notion, así que una edición se detecta al recargar.
+  Apto para pilotos y revisión humana; para regulado, Postgres/WORM autoritativo.
 
 ```python
 store = SqliteEventStore("expedientes.db")

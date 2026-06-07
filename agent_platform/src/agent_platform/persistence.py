@@ -13,6 +13,7 @@ El almacén es append-only por run: re-guardar un run existente es un IntegrityE
 """
 from __future__ import annotations
 
+import os
 import sqlite3
 from typing import Any, Protocol
 
@@ -109,3 +110,102 @@ class PostgresEventStore:
 
     def cerrar(self) -> None:
         self._conn.close()
+
+
+# === Notion como almacén (mirror / piloto) ================================
+_NOTION_CHUNK = 1900  # < 2000: límite por segmento rich_text de Notion
+
+
+def _trocear(texto: str, n: int = _NOTION_CHUNK) -> list[str]:
+    return [texto[i:i + n] for i in range(0, len(texto), n)] or [""]
+
+
+def _rich_text(texto: str) -> list[dict[str, Any]]:
+    return [{"type": "text", "text": {"content": c}} for c in _trocear(texto)]
+
+
+def _titulo(texto: str) -> list[dict[str, Any]]:
+    return [{"type": "text", "text": {"content": texto}}]
+
+
+def _leer_rich_text(prop: dict[str, Any]) -> str:
+    segs = prop.get("rich_text", [])
+    return "".join(s.get("plain_text") or s["text"]["content"] for s in segs)
+
+
+class NotionEventStore:
+    """EventStore sobre una base de datos de Notion (mismo contrato, drop-in).
+
+    AVISO honesto: Notion es **mutable** y **no-WORM**. La tamper-evidence SÍ se
+    mantiene —el sello se firma con una clave del runtime que NO se almacena en
+    Notion, así que cualquier edición se detecta al recargar con `verify_chain`—,
+    pero Notion no ofrece las garantías de inmutabilidad/disponibilidad de un WORM.
+    Apto para pilotos, mirror de revisión y entornos no regulados; para expediente
+    regulado, mantén Postgres/WORM como almacén autoritativo (§6/§7).
+
+    La base debe tener estas propiedades: 'run' (title), 'idx' (number),
+    'evento' (rich_text), 'hash' (rich_text). El evento se serializa a JSON y se
+    trocea en segmentos de <2000 caracteres; el sello va en una fila con idx = -1.
+    """
+
+    def __init__(self, database_id: str, client: Any | None = None) -> None:
+        if client is None:
+            from notion_client import Client  # dependencia opcional [notion]
+            client = Client(auth=os.environ["NOTION_TOKEN"])
+        self._client: Any = client
+        self._db = database_id
+
+    def _filas(self, run_id: str) -> list[dict[str, Any]]:
+        filas: list[dict[str, Any]] = []
+        cursor: str | None = None
+        while True:
+            kwargs: dict[str, Any] = {
+                "database_id": self._db,
+                "filter": {"property": "run", "title": {"equals": run_id}},
+            }
+            if cursor is not None:
+                kwargs["start_cursor"] = cursor
+            resp = self._client.databases.query(**kwargs)
+            filas.extend(resp["results"])
+            if not resp.get("has_more"):
+                break
+            cursor = resp.get("next_cursor")
+        return filas
+
+    def _crear_fila(self, run_id: str, idx: int, evento: str, etiqueta: str) -> None:
+        self._client.pages.create(
+            parent={"database_id": self._db},
+            properties={
+                "run": {"title": _titulo(run_id)},
+                "idx": {"number": idx},
+                "evento": {"rich_text": _rich_text(evento)},
+                "hash": {"rich_text": _rich_text(etiqueta)},
+            },
+        )
+
+    def guardar(self, run_id: str, log: list[AuditEvent], seal: str) -> None:
+        if self._filas(run_id):
+            raise IntegrityError(f"run '{run_id}' ya existe: el log es append-only")
+        for i, e in enumerate(log):
+            self._crear_fila(run_id, i, e.model_dump_json(), e.event_hash)
+        self._crear_fila(run_id, -1, seal, "SELLO")
+
+    def cargar(self, run_id: str) -> tuple[list[AuditEvent], str]:
+        filas = self._filas(run_id)
+        if not filas:
+            raise IntegrityError(f"run '{run_id}' no encontrado")
+        seal: str | None = None
+        pares: list[tuple[int, str]] = []
+        for f in filas:
+            props = f["properties"]
+            idx = int(props["idx"]["number"])
+            texto = _leer_rich_text(props["evento"])
+            if idx == -1:
+                seal = texto
+            else:
+                pares.append((idx, texto))
+        if seal is None:
+            raise IntegrityError(f"run '{run_id}': falta el sello")
+        pares.sort()
+        log = [AuditEvent.model_validate_json(t) for _, t in pares]
+        return log, seal

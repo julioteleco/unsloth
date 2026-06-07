@@ -25,6 +25,9 @@ llm = [
 postgres = [
     "psycopg[binary]>=3.1",  # PostgresEventStore (sistema de registro)
 ]
+notion = [
+    "notion-client>=2.0",    # NotionEventStore (mirror / piloto)
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agent_platform"]
@@ -41,7 +44,7 @@ packages = ["agent_platform"]
 
 # Dependencias opcionales con import perezoso: no instaladas en CI.
 [[tool.mypy.overrides]]
-module = ["anthropic.*", "psycopg.*"]
+module = ["anthropic.*", "psycopg.*", "notion_client.*"]
 ignore_missing_imports = true
 
 [tool.ruff]
