@@ -51,13 +51,19 @@ datos recuperados se validan (esquema + policy + taint) *antes* de que
 
 ```bash
 cd agent_platform
-pip install -e ".[dev]"      # pydantic + mypy + pytest
+make install                  # pip install -e ".[dev]"  (pydantic + mypy + pytest + ruff)
 
-pytest                        # 13 tests
-mypy                          # --strict, limpio (config en pyproject.toml)
-python examples/demo.py       # demo end-to-end
-python tests/test_core.py     # corre los 13 tests sin pytest
+make check                    # lint + typecheck + test, todo de una
+# o individualmente:
+make lint                     # ruff check
+make typecheck                # mypy --strict (config en pyproject.toml)
+make test                     # pytest -q  (13 tests)
+make demo                     # python examples/demo.py  (end-to-end)
 ```
+
+Sin `make`, los comandos equivalentes son `ruff check src tests examples`,
+`mypy`, `pytest -q` y `python examples/demo.py`. CI los corre en cada push/PR
+que toque `agent_platform/` (`.github/workflows/agent_platform-ci.yml`).
 
 ## Límites honestos
 

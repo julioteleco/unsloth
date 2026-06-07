@@ -6,14 +6,14 @@ depende del ToolKind del paso (§6).
 """
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from .audit import verify_chain
 from .contracts import AuditEvent
 from .tools import REGISTRY, ToolKind, _hash
 
 
-class Verdict(str, Enum):
+class Verdict(StrEnum):
     REPRODUCED = "reproduced"      # re-ejecutado, output idéntico (pure / idempotent c/ snapshot)
     VERIFIED = "verified"          # no re-ejecutable; output registrado e íntegro (effectful)
     UNREPLAYABLE = "unreplayable"  # paso fallido, sin evidencia, o cadena rota

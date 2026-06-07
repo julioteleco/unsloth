@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -27,7 +27,7 @@ class Ref(BaseModel):
     source: str  # clave de un dato recuperado, o id de un paso previo
 
 
-Arg = Annotated[Union[Lit, Ref], Field(discriminator="kind")]
+Arg = Annotated[Lit | Ref, Field(discriminator="kind")]
 
 
 class Step(BaseModel):

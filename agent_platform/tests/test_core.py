@@ -9,8 +9,10 @@ Demuestran, en código que *enforce* —no en prosa—, cinco propiedades:
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from decimal import Decimal
-from typing import Callable
+
+import pytest
 
 from agent_platform import (
     AuditEvent,
@@ -129,11 +131,8 @@ def test_full_chain_recompute_defeated_by_seal() -> None:
 def test_unregistered_tool_is_rejected() -> None:
     r = MockReasoner()
     bad = Plan(goal="x", steps=[Step(id="s1", op="rm_rf", args={})])
-    try:
+    with pytest.raises(PolicyError, match="no registrada"):  # excepción tipada, no assert
         execute(bad, r, _META)
-        assert False, "debió rechazar herramienta no registrada"
-    except PolicyError as e:                       # FIX: excepción tipada, no assert
-        assert "no registrada" in str(e)
 
 
 def test_tainted_retrieved_data_cannot_trigger_effect_without_gate() -> None:
@@ -144,11 +143,8 @@ def test_tainted_retrieved_data_cannot_trigger_effect_without_gate() -> None:
     p = Plan(goal="x", steps=[
         Step(id="s1", op="transfer", args={"amount": Ref(source="doc_amount")}),  # sin gate
     ])
-    try:
+    with pytest.raises(PolicyError, match="tainted"):
         execute(p, r, _META, retrieved)
-        assert False, "policy debió bloquear efecto desde dato tainted sin gate"
-    except PolicyError as e:
-        assert "tainted" in str(e)
 
 
 def test_taint_propagates_through_derived_output() -> None:
@@ -161,21 +157,15 @@ def test_taint_propagates_through_derived_output() -> None:
         Step(id="s1", op="sum", args={"x": Ref(source="doc_amount"), "y": _lit("0")}),
         Step(id="s2", op="transfer", args={"amount": Ref(source="s1")}),  # hereda taint de s1
     ])
-    try:
+    with pytest.raises(PolicyError, match="tainted"):
         execute(p, r, _META, retrieved)
-        assert False, "la taint debió propagarse a s2 y exigir gate"
-    except PolicyError as e:
-        assert "tainted" in str(e)
 
 
 def test_gate_required_effect_without_token_is_rejected() -> None:
     r = MockReasoner()
     p = Plan(goal="x", steps=[Step(id="s1", op="transfer", args={"amount": _lit("1")})])  # sin gate
-    try:
+    with pytest.raises(PolicyError, match="gate"):
         execute(p, r, _META)
-        assert False, "debió exigir gate humano"
-    except PolicyError as e:
-        assert "gate" in str(e)
 
 
 def test_repair_path_is_reauthorized() -> None:
@@ -186,11 +176,8 @@ def test_repair_path_is_reauthorized() -> None:
         return Step(id=s.id, op="transfer", args={"amount": _lit("9999")})  # sin gate
     r = MockReasoner(repair_fn=malicious_repair)
     p = Plan(goal="x", steps=[Step(id="s1", op="ratio", args={"x": _lit("8"), "y": _lit("0")})])
-    try:
+    with pytest.raises(PolicyError, match="gate"):
         execute(p, r, _META)
-        assert False, "la re-autorización debió rechazar el paso reparado"
-    except PolicyError as e:
-        assert "gate" in str(e)
 
 
 def test_idempotent_reproduced_with_snapshot_verified_without() -> None:
@@ -218,12 +205,10 @@ def test_self_healing_recovers_within_budget() -> None:
 def test_self_healing_escalates_when_budget_exhausted() -> None:
     r = MockReasoner(repair_fn=lambda s, _e: s)  # "repara" sin arreglar nada
     p = Plan(goal="x", steps=[Step(id="s1", op="ratio", args={"x": _lit("8"), "y": _lit("0")})])
-    try:
+    with pytest.raises(Escalation) as exc_info:
         execute(p, r, _META, budget=Budget(max_retries=2))
-        assert False, "debió escalar al agotar reintentos"
-    except Escalation as e:
-        assert e.step_id == "s1"
-        assert len(e.log) == 3                    # intento inicial + 2 reintentos, todos fallidos
+    assert exc_info.value.step_id == "s1"
+    assert len(exc_info.value.log) == 3           # intento inicial + 2 reintentos, todos fallidos
 
 
 if __name__ == "__main__":

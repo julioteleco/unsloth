@@ -27,6 +27,7 @@ from .sealing import seal_head
 from .tools import REGISTRY, Tool, ToolKind
 
 __all__ = [
+    "REGISTRY",
     "Arg",
     "AuditEvent",
     "Budget",
@@ -36,7 +37,6 @@ __all__ = [
     "Meta",
     "Plan",
     "PolicyError",
-    "REGISTRY",
     "ReasoningEngine",
     "Ref",
     "Step",

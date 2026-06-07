@@ -28,11 +28,13 @@ class DemoReasoner:
     seed: int | None = 7
 
     def plan(self, goal: str) -> Plan:
+        def lit(x: str) -> Lit:
+            return Lit(value=Decimal(x))
+
         return Plan(goal=goal, steps=[
-            Step(id="s1", op="sum", args={"x": Lit(value=Decimal("10")), "y": Lit(value=Decimal("5"))}),
-            Step(id="s2", op="ratio", args={"x": Lit(value=Decimal("30")), "y": Lit(value=Decimal("4"))}),
-            Step(id="s3", op="transfer", args={"amount": Lit(value=Decimal("100"))},
-                 gate_token="sig:alice"),
+            Step(id="s1", op="sum", args={"x": lit("10"), "y": lit("5")}),
+            Step(id="s2", op="ratio", args={"x": lit("30"), "y": lit("4")}),
+            Step(id="s3", op="transfer", args={"amount": lit("100")}, gate_token="sig:alice"),
         ])
 
     def repair(self, step: Step, error: str) -> Step:

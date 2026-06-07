@@ -7,14 +7,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
-from enum import Enum
-from typing import Callable
+from enum import StrEnum
 
 
 # === Taxonomía de herramientas ===========================================
-class ToolKind(str, Enum):
+class ToolKind(StrEnum):
     PURE = "pure"              # determinista, sin efectos -> replay RE-EJECUTA
     IDEMPOTENT = "idempotent"  # efecto seguro de repetir con misma key + snapshot
     EFFECTFUL = "effectful"    # efecto NO repetible -> replay solo VERIFICA, nunca re-ejecuta

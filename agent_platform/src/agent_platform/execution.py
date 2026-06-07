@@ -6,8 +6,8 @@ registro y policy en cada vuelta -> no hay bypass por el camino de repair.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from decimal import Decimal
-from typing import Mapping
 
 from .contracts import AuditEvent, Meta, Plan, Step, Value
 from .errors import Budget, Escalation, PolicyError
