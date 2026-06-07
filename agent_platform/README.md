@@ -1,0 +1,67 @@
+# Plataforma de Agentes Empresariales — Núcleo del contrato
+
+Implementación del **contrato del núcleo (§4)** del documento de arquitectura
+(`docs/arquitectura.md`): un esqueleto *runnable* y `mypy --strict` limpio que
+*enforce* —no en prosa— el invariante central de la plataforma.
+
+> **Principio rector:** la estocasticidad se confina a la capa de planificación;
+> todo lo de abajo es tipado, auditable y —donde la naturaleza del efecto lo
+> permite— reproducible. El LLM nunca calcula, decide montos ni produce el output
+> final: produce un **plan tipado** que se valida contra el registro de
+> herramientas y el policy engine *antes* de ejecutarse.
+
+## Qué demuestra el código (cinco propiedades)
+
+1. **Ejecución determinista y auditable** — dinero en `Decimal`, nunca `float`.
+2. **Replay con veredicto por paso** según el tipo de efecto (`ToolKind`):
+   `REPRODUCED` para puros e idempotentes (con idempotency key + snapshot),
+   `VERIFIED` para efectos no repetibles, `UNREPLAYABLE` para fallos o evidencia rota.
+3. **Taint derivada por procedencia** — el runtime la deriva de la procedencia de
+   cada argumento y la propaga a las salidas; el plan (output del LLM) no la
+   declara. Un dato recuperado *tainted* no dispara un efecto sin gate, ni
+   directamente ni a través de pasos derivados.
+4. **Camino de reparación re-autorizado** — una reparación maliciosa no evade la policy.
+5. **Log tamper-evident** — hash-encadenado y sellado con un ancla externa, no un
+   simple append-only.
+
+## Estructura (capas desacopladas)
+
+```
+src/agent_platform/
+  tools.py        # ToolKind, Tool, REGISTRY, hashing canónico
+  contracts.py    # Lit, Ref, Arg, Step, Plan, Value, Meta, AuditEvent (contratos tipados)
+  reasoning.py    # ReasoningEngine (Protocol) — la única pieza estocástica
+  errors.py       # PolicyError, IntegrityError, Escalation, Budget
+  sealing.py      # seal_head — ancla externa (HMAC modela firma/WORM)
+  policy.py       # _resolve (deriva taint) + authorize (policy en código)
+  execution.py    # execute / _run_step — ejecución + self-healing acotado
+  audit.py        # verify_chain — verificación de la cadena (Chain-of-Work)
+  replay.py       # Verdict, replay — veredicto tipado por paso
+tests/test_core.py   # 13 tests del invariante
+examples/demo.py     # demo end-to-end
+docs/arquitectura.md # documento de arquitectura completo
+```
+
+Cada capa habla con la siguiente por contratos tipados (Pydantic), nunca por
+texto libre del LLM. La **trust boundary** está en `policy.py`: el plan y los
+datos recuperados se validan (esquema + policy + taint) *antes* de que
+`execution.py` los ejecute.
+
+## Uso
+
+```bash
+cd agent_platform
+pip install -e ".[dev]"      # pydantic + mypy + pytest
+
+pytest                        # 13 tests
+mypy                          # --strict, limpio (config en pyproject.toml)
+python examples/demo.py       # demo end-to-end
+python tests/test_core.py     # corre los 13 tests sin pytest
+```
+
+## Límites honestos
+
+Esto certifica *qué pasó*, no que el planner sea determinista. No promete "IA
+determinista" ni "cero alucinaciones": el planner sigue siendo estocástico. La
+promesa es **ejecución verificable y auditable**, con la distinción
+reproduce/verifica explícita. Ver §11 y §12 del documento de arquitectura.
