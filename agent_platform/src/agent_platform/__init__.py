@@ -26,17 +26,20 @@ from .persistence import (
     PostgresEventStore,
     SqliteEventStore,
 )
+from .planner import ClaudePlanner
 from .policy import authorize
 from .reasoning import ReasoningEngine
 from .replay import Verdict, replay
 from .sealing import Ed25519Sealer, HmacSealer, Sealer, seal_head
 from .tools import REGISTRY, Tool, ToolKind
+from .tools_http import crear_tool_http
 
 __all__ = [
     "REGISTRY",
     "Arg",
     "AuditEvent",
     "Budget",
+    "ClaudePlanner",
     "Ed25519Sealer",
     "Escalation",
     "EventStore",
@@ -58,6 +61,7 @@ __all__ = [
     "Value",
     "Verdict",
     "authorize",
+    "crear_tool_http",
     "execute",
     "replay",
     "seal_head",

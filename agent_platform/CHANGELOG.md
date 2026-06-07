@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Añadido (planner real, tool effectful, instalación local)
+- **`ClaudePlanner`** (`agent_platform.planner`, `[llm]`): Reasoning Engine real
+  sobre Claude (Opus 4.8, salida estructurada). El plan del LLM se materializa al
+  `Plan` tipado y sigue pasando por policy (un plan malicioso se rechaza). 4 tests
+  con cliente falso.
+- **`crear_tool_http`** (`agent_platform.tools_http`): fábrica de herramientas
+  `EFFECTFUL` reales por HTTP (stdlib, idempotency key). Test de **integración**
+  contra un servidor local (`http.server`): el efecto ocurre, el output se
+  registra y el replay lo atestigua `VERIFIED`.
+- **Instalación local**: comando de consola `licita` (`[project.scripts]`),
+  `INSTALL.md` (venv, matriz de extras, variables de entorno, build de wheel).
+
 ### Añadido (ancla externa real)
 - **Sello pluggable** (`Sealer` Protocol): `HmacSealer` (default, simétrico, cero
   dependencias) y **`Ed25519Sealer`** (firma asimétrica, opcional `[crypto]`). El

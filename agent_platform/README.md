@@ -67,6 +67,18 @@ Sin `make`, los comandos equivalentes son `ruff check src tests examples`,
 `mypy`, `pytest -q` y `python examples/demo.py`. CI los corre en cada push/PR
 que toque `agent_platform/` (`.github/workflows/agent_platform-ci.yml`).
 
+**Instalación local** (venv, extras opcionales, comando de consola `licita`,
+build de wheel): ver [`INSTALL.md`](INSTALL.md).
+
+### Planner real y herramientas con efecto
+
+- **`ClaudePlanner`** (`[llm]`): Reasoning Engine sobre Claude (Opus 4.8). Emite
+  un plan que el runtime materializa al `Plan` tipado — y que **sigue pasando por
+  policy**: un plan malicioso del modelo se rechaza igual que cualquier otro.
+- **`crear_tool_http`**: fábrica de herramientas `EFFECTFUL` reales que golpean un
+  sistema externo por HTTP con idempotency key; el veredicto `VERIFIED` atestigua
+  esa llamada (con test de integración contra un servidor local).
+
 ## Aplicación incluida: licitaciones públicas (LCSP 9/2017)
 
 El subpaquete `agent_platform.tenders` aplica el núcleo a la **redacción y
